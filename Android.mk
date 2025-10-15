@@ -11,7 +11,6 @@ include $(CLEAR_VARS)
 LOCAL_MODULE := gfxshim_loader
 LOCAL_SRC_FILES := gfxshim_loader.c
 LOCAL_CFLAGS := -D_GNU_SOURCE
-LOCAL_LDLIBS := -ldl -llog -lpthread
+LOCAL_LDLIBS := -ldl -llog
 LOCAL_MODULE_TAGS := optional
-LOCAL_MULTILIB := both
 include $(BUILD_EXECUTABLE)
