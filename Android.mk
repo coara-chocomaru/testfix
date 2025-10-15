@@ -6,11 +6,3 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)
 LOCAL_LDLIBS := -llog -ldl
 LOCAL_CPPFLAGS := -fPIC -std=c++11 -D_GNU_SOURCE -pthread
 include $(BUILD_SHARED_LIBRARY)
-
-include $(CLEAR_VARS)
-LOCAL_MODULE := gfxshim_loader
-LOCAL_SRC_FILES := gfxshim_loader.c
-LOCAL_CFLAGS := -D_GNU_SOURCE
-LOCAL_LDLIBS := -ldl -llog
-LOCAL_MODULE_TAGS := optional
-include $(BUILD_EXECUTABLE)
