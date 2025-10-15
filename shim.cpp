@@ -1,4 +1,3 @@
-
 #define _GNU_SOURCE
 #include <dlfcn.h>
 #include <pthread.h>
@@ -16,8 +15,8 @@
 
 static pthread_once_t resolver_once = PTHREAD_ONCE_INIT;
 
-typedef void (*ctor_t)(void* /*thisptr*/, unsigned int, unsigned int, int, unsigned int);
-typedef void (*dtor_t)(void* /*thisptr*/);
+typedef void (*ctor_t)(void*, unsigned int, unsigned int, int, unsigned int);
+typedef void (*dtor_t)(void*);
 
 static ctor_t real_ctor = nullptr;
 static dtor_t real_dtor = nullptr;
@@ -57,45 +56,36 @@ static void try_resolve_from_libs() {
             handle = dlopen(lib, RTLD_NOW);
         }
         if (!handle) continue;
-
         ALOGI("libgfxshim: opened %s", lib);
-
         void* sym = dlsym(handle, mangled_ctor_c1);
         if (!sym) sym = dlsym(handle, mangled_ctor_c2);
         if (sym) {
             real_ctor = (ctor_t)sym;
             ALOGI("libgfxshim: resolved ctor in %s", lib);
         }
-
         void* dsym = dlsym(handle, mangled_dtor_d1);
         if (!dsym) dsym = dlsym(handle, mangled_dtor_d2);
         if (dsym) {
             real_dtor = (dtor_t)dsym;
             ALOGI("libgfxshim: resolved dtor in %s", lib);
         }
-
         if (real_ctor && real_dtor) return;
     }
 }
 
 static void init_resolver_once() {
     try_resolve_from_libs();
-    // If still not found, attempt to scan /proc/self/maps for libraries and dlopen them
     if (!real_ctor || !real_dtor) {
         FILE* f = fopen("/proc/self/maps", "r");
         if (f) {
             char line[4096];
             while (fgets(line, sizeof(line), f)) {
-                // look for ".so" path at end
                 char* so = strstr(line, ".so");
                 if (!so) continue;
-                // find the start of path (first '/')
                 char* path = strchr(line, '/');
                 if (!path) continue;
-                // trim newline and any trailing characters
                 char* nl = strchr(path, '\n');
                 if (nl) *nl = '\0';
-                // try dlopen it
                 void* h = dlopen(path, RTLD_NOW | RTLD_NOLOAD);
                 if (!h) h = dlopen(path, RTLD_NOW);
                 if (!h) continue;
@@ -126,18 +116,16 @@ static void init_resolver_once() {
 
 extern "C" {
 
-// Fallback constructor implementation (mimics original behavior enough for vendor blobs)
 void _ZN7android13GraphicBufferC1Ejjij(void* thiz, unsigned int w, unsigned int h, int format, unsigned int usage) {
     pthread_once(&resolver_once, init_resolver_once);
     if (real_ctor) {
         real_ctor(thiz, w, h, format, usage);
         return;
     }
-
     if (thiz) {
         memset(thiz, 0, sizeof(MinimalGraphicBuffer));
         MinimalGraphicBuffer tmp;
-        tmp.magic = 0x47424658ULL; // 'GBFX' or arbitrary magic
+        tmp.magic = 0x47424658ULL;
         tmp.width = w;
         tmp.height = h;
         tmp.format = format;
@@ -148,18 +136,15 @@ void _ZN7android13GraphicBufferC1Ejjij(void* thiz, unsigned int w, unsigned int 
 }
 
 void _ZN7android13GraphicBufferC2Ejjij(void* thiz, unsigned int w, unsigned int h, int format, unsigned int usage) {
-    // Typically C2 delegates to C1; do the same
     _ZN7android13GraphicBufferC1Ejjij(thiz, w, h, format, usage);
 }
 
-// Provide simple no-op destructors to satisfy vendors that call them
 void _ZN7android13GraphicBufferD1Ev(void* thiz) {
     pthread_once(&resolver_once, init_resolver_once);
     if (real_dtor) {
         real_dtor(thiz);
         return;
     }
-    // best-effort: clear memory
     if (thiz) {
         memset(thiz, 0, sizeof(MinimalGraphicBuffer));
     }
@@ -170,9 +155,8 @@ void _ZN7android13GraphicBufferD2Ev(void* thiz) {
     _ZN7android13GraphicBufferD1Ev(thiz);
 }
 
-} // extern "C"
+}
 
-// attempt to pre-resolve when library is loaded
 __attribute__((constructor))
 static void pre_resolve_shim() {
     pthread_once(&resolver_once, init_resolver_once);
