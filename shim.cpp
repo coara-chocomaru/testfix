@@ -22,7 +22,6 @@ typedef void (*dtor_t)(void* /*thisptr*/);
 static ctor_t real_ctor = nullptr;
 static dtor_t real_dtor = nullptr;
 
-// Common mangled names encountered in 32/64-bit vendor blobs
 static const char* mangled_ctor_c1 = "_ZN7android13GraphicBufferC1Ejjij";
 static const char* mangled_ctor_c2 = "_ZN7android13GraphicBufferC2Ejjij";
 static const char* mangled_dtor_d1 = "_ZN7android13GraphicBufferD1Ev";
@@ -50,7 +49,6 @@ struct MinimalGraphicBuffer {
     void*    reserved[4];
 };
 
-// Try resolving symbol by scanning candidate libraries (dlopen/dlsym)
 static void try_resolve_from_libs() {
     for (const char** p = candidate_libs; *p; ++p) {
         const char* lib = *p;
