@@ -556,3 +556,4 @@ attribute((constructor)) static void shim_init(void)
     void* gles = dlopen("libGLESv2.so", RTLD_NOW | RTLD_GLOBAL);
     mylog("shim_init: libEGL=%p libGLESv2=%p", eg, gles);
 }
+
