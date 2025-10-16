@@ -27,8 +27,6 @@ static void* open_libui()
 namespace shim {
 using ctor_new_str_t = void (*)(void*, uint32, uint32, int32, uint32, std::string const&);
 using ctor_new_cstr_t = void (*)(void*, uint32, uint32, int32, uint32, const char*);
-using ctor_old_t = void (*)(void*, uint32, uint32, int32, uint32);
-using ctor_old_y_t = void (*)(void*, uint32, uint32, int32, uint32, unsigned char);
 using ctor_with_stride_t = void (*)(void*, uint32, uint32, int32, uint32, uint32, void*, bool);
 using dtor_t = void (*)(void*);
 struct Resolvers {
@@ -88,7 +86,9 @@ static void call_ctor_new_str(void* _this, uint32 w, uint32 h, int32 f, uint32 u
 }
 static void call_ctor_new_cstr(void* _this, uint32 w, uint32 h, int32 f, uint32 u, const char* s)
 {
-    if (g_resolvers.new_ctor_cstr) g_resolvers.new_ctor_cstr(_this, w, h, f, u, std::string(s ? s : ""));
+    if (!g_resolvers.new_ctor_cstr) return;
+    std::string tmp = s ? s : "";
+    g_resolvers.new_ctor_cstr(_this, w, h, f, u, tmp.c_str());
 }
 extern "C" void _ZN7android13GraphicBufferC1Ejjij(void* _this, uint32 inWidth, uint32 inHeight, int32 inFormat, uint32 inUsage)
 {
