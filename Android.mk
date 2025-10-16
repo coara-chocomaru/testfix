@@ -28,7 +28,6 @@ LOCAL_CPPFLAGS := -fPIC -std=gnu++11 -DANDROID -O2 -Wall -Wno-unused-parameter -
 LOCAL_LDLIBS := -llog -ldl
 include $(BUILD_SHARED_LIBRARY)
 
-
 include $(CLEAR_VARS)
 LOCAL_MODULE := libshim_gui_ui
 LOCAL_MODULE_TAGS := optional
