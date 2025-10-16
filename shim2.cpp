@@ -2,10 +2,10 @@
 #include <cstdlib>
 #include <cstring>
 #include <dlfcn.h>
-#include <mutex>
 #include <string>
 #include <atomic>
 #include <unistd.h>
+#include <pthread.h>
 using uint32 = uint32_t;
 using int32 = int32_t;
 static void* open_libui()
@@ -13,8 +13,9 @@ static void* open_libui()
     static std::atomic<void*> handle{nullptr};
     void* h = handle.load(std::memory_order_acquire);
     if (h) return h;
-    static std::mutex m;
-    std::lock_guard<std::mutex> lk(m);
+    static pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
+    struct pthread_lock_guard { pthread_mutex_t* m; pthread_lock_guard(pthread_mutex_t* mm):m(mm){pthread_mutex_lock(m);} ~pthread_lock_guard(){pthread_mutex_unlock(m);} };
+    pthread_lock_guard lk(&m);
     h = handle.load(std::memory_order_relaxed);
     if (h) return h;
     h = dlopen("/system/lib/libui.so", RTLD_LAZY | RTLD_LOCAL);
