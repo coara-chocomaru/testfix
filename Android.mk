@@ -30,11 +30,16 @@ include $(BUILD_SHARED_LIBRARY)
 
 include $(CLEAR_VARS)
 LOCAL_MODULE := libshim_gui_ui
-LOCAL_MODULE_TAGS := optional
 LOCAL_SRC_FILES := sm.cpp
-LOCAL_CPPFLAGS := -fPIC -std=gnu++11
-LOCAL_LDLIBS := -ldl -latomic -lc++_static -lm
+LOCAL_CPPFLAGS := -fPIC -std=gnu++11 -D_GLIBCXX_USE_CXX11_ABI=1 -DANDROID -fno-exceptions -fno-rtti
+LOCAL_C_INCLUDES :=
+LOCAL_LDLIBS := -ldl -llog -lm
+LOCAL_STATIC_LIBRARIES := libc++_static libc++abi libunwind
 LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE_CLASS := SHARED_LIBRARIES
 LOCAL_MODULE_SUFFIX := .so
 include $(BUILD_SHARED_LIBRARY)
+
+$(call import-module, cxx-stl/llvm-libc++)
+$(call import-module, libc++abi)
+$(call import-module, libunwind)
