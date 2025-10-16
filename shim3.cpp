@@ -8,7 +8,7 @@
 #include <pthread.h>
 #include <android/log.h>
 #include <cstdarg>
-#include <map>
+#include <unordered_map>
 using uint32 = uint32_t;
 using int32 = int32_t;
 static const char* TAG = "libshim_gui_combined";
@@ -46,7 +46,7 @@ static void* resolve_host_lib()
 }
 static void* resolve_sym_cached(const char* name)
 {
-    static std::map<std::string, void*> cache;
+    static std::unordered_map<std::string, void*> cache;
     auto it = cache.find(name);
     if (it != cache.end()) return it->second;
     void* h = resolve_host_lib();
@@ -59,11 +59,11 @@ static void* resolve_sym_cached(const char* name)
     return s;
 }
 namespace shim {
-using ctor_str_t = void ()(void, uint32, uint32, int32, uint32, std::string const&);
-using ctor_cstr_t = void ()(void, uint32, uint32, int32, uint32, const char*);
-using ctor_basic_t = void ()(void, uint32, uint32, int32, uint32);
-using ctor_stride_t = void ()(void, uint32, uint32, int32, uint32, uint32, void*, bool);
-using dtor_t = void ()(void);
+using ctor_str_t = void (*)(void*, uint32, uint32, int32, uint32, std::string const&);
+using ctor_cstr_t = void (*)(void*, uint32, uint32, int32, uint32, const char*);
+using ctor_basic_t = void (*)(void*, uint32, uint32, int32, uint32);
+using ctor_stride_t = void (*)(void*, uint32, uint32, int32, uint32, uint32, void*, bool);
+using dtor_t = void (*)(void*);
 struct Resolvers {
     ctor_str_t ctor_str = nullptr;
     ctor_cstr_t ctor_cstr = nullptr;
@@ -97,27 +97,27 @@ struct Resolvers {
             "_ZN7android13GraphicBufferC2Ejjij",
             nullptr
         };
-        for (const char** p = candidates; p; ++p) {
-            void s = dlsym(h, p);
+        for (const char** p = candidates; *p; ++p) {
+            void* s = dlsym(h, *p);
             if (!s) continue;
-            if (!ctor_str && strstr(p,"basic_string")) ctor_str = reinterpret_cast<ctor_str_t>(s);
-            if (!ctor_cstr && strstr(p,"PKc")) ctor_cstr = reinterpret_cast<ctor_cstr_t>(s);
-            if (!ctor_stride && strstr(p,"native_handle")) ctor_stride = reinterpret_cast<ctor_stride_t>(s);
-            if (!ctor_basic && !strstr(p,"basic_string") && !strstr(p,"PKc") && !strstr(p,"native_handle")) ctor_basic = reinterpret_cast<ctor_basic_t>(s);
+            if (!ctor_str && strstr(*p,"basic_string")) ctor_str = reinterpret_cast<ctor_str_t>(s);
+            if (!ctor_cstr && strstr(*p,"PKc")) ctor_cstr = reinterpret_cast<ctor_cstr_t>(s);
+            if (!ctor_stride && strstr(*p,"native_handle")) ctor_stride = reinterpret_cast<ctor_stride_t>(s);
+            if (!ctor_basic && !strstr(*p,"basic_string") && !strstr(*p,"PKc") && !strstr(*p,"native_handle")) ctor_basic = reinterpret_cast<ctor_basic_t>(s);
             if (ctor_str && ctor_cstr && ctor_stride && ctor_basic) break;
         }
-        void d = dlsym(h, "_ZN7android13GraphicBufferD1Ev");
+        void* d = dlsym(h, "_ZN7android13GraphicBufferD1Ev");
         if (!d) d = dlsym(h, "_ZN7android13GraphicBufferD2Ev");
         dtor = reinterpret_cast<dtor_t>(d);
         mylog("resolve: ctor_str=%p ctor_cstr=%p ctor_stride=%p ctor_basic=%p dtor=%p", ctor_str, ctor_cstr, ctor_stride, ctor_basic, dtor);
     }
 };
 static Resolvers g_resolvers;
-extern "C" void _ZN7android13GraphicBufferC1Ejjij(void _this, uint32 inWidth, uint32 inHeight, int32 inFormat, uint32 inUsage) asm("_ZN7android13GraphicBufferC1Ejjij");
-extern "C" void _ZN7android13GraphicBufferC2Ejjij(void _this, uint32 inWidth, uint32 inHeight, int32 inFormat, uint32 inUsage) asm("_ZN7android13GraphicBufferC2Ejjij");
-extern "C" void _ZN7android13GraphicBufferC1Ejjijy(void _this, uint32 inWidth, uint32 inHeight, int32 inFormat, uint32 inUsage, unsigned char arg) asm("_ZN7android13GraphicBufferC1Ejjijy");
-extern "C" void _ZN7android13GraphicBufferC2Ejjijy(void _this, uint32 inWidth, uint32 inHeight, int32 inFormat, uint32 inUsage, unsigned char arg) asm("_ZN7android13GraphicBufferC2Ejjijy");
-extern "C" void _ZN7android13GraphicBufferC1EjjijjP11native_handle(void _this, uint32 inWidth, uint32 inHeight, int32 inFormat, uint32 inUsage, uint32 inStride, void inHandle) asm("_ZN7android13GraphicBufferC1EjjijjP11native_handle");
+extern "C" void _ZN7android13GraphicBufferC1Ejjij(void* _this, uint32 inWidth, uint32 inHeight, int32 inFormat, uint32 inUsage) asm("_ZN7android13GraphicBufferC1Ejjij");
+extern "C" void _ZN7android13GraphicBufferC2Ejjij(void* _this, uint32 inWidth, uint32 inHeight, int32 inFormat, uint32 inUsage) asm("_ZN7android13GraphicBufferC2Ejjij");
+extern "C" void _ZN7android13GraphicBufferC1Ejjijy(void* _this, uint32 inWidth, uint32 inHeight, int32 inFormat, uint32 inUsage, unsigned char arg) asm("_ZN7android13GraphicBufferC1Ejjijy");
+extern "C" void _ZN7android13GraphicBufferC2Ejjijy(void* _this, uint32 inWidth, uint32 inHeight, int32 inFormat, uint32 inUsage, unsigned char arg) asm("_ZN7android13GraphicBufferC2Ejjijy");
+extern "C" void _ZN7android13GraphicBufferC1EjjijjP11native_handle(void* _this, uint32 inWidth, uint32 inHeight, int32 inFormat, uint32 inUsage, uint32 inStride, void* inHandle) asm("_ZN7android13GraphicBufferC1EjjijjP11native_handle");
 extern "C" void _ZN7android13GraphicBufferC2EjjijjP11native_handle(void* _this, uint32 inWidth, uint32 inHeight, int32 inFormat, uint32 inUsage, uint32 inStride, void* inHandle) asm("_ZN7android13GraphicBufferC2EjjijjP11native_handle");
 extern "C" void _ZN7android13GraphicBufferD1Ev(void* _this) asm("_ZN7android13GraphicBufferD1Ev");
 extern "C" void _ZN7android13GraphicBufferD2Ev(void* _this) asm("_ZN7android13GraphicBufferD2Ev");
@@ -289,14 +289,14 @@ void _ZN7android11BufferQueue17createBufferQueueEPNS_2spINS_22IGraphicBufferProd
     const char* sym = "_ZN7android11BufferQueue17createBufferQueueEPNS_2spINS_22IGraphicBufferProducerEEEPNS1_INS_22IGraphicBufferConsumerEEERKNS1_INS_19IGraphicBufferAllocEEE";
     void* fptr = resolve_sym_cached(sym);
     if (fptr) {
-        typedef void (fn_t)(void, void*, const void*);
+        typedef void (*fn_t)(void*, void*, const void*);
         fn_t fn = reinterpret_cast<fn_t>(fptr);
         fn(outProducer, outConsumer, allocator);
         return;
     }
     mylog("fallback createBufferQueue called");
-    if (outProducer) ((void)outProducer) = nullptr;
-    if (outConsumer) ((void)outConsumer) = nullptr;
+    if (outProducer) *((void**)outProducer) = nullptr;
+    if (outConsumer) *((void**)outConsumer) = nullptr;
     return;
 }
 extern "C" void _ZN7android11BufferQueue21ProxyConsumerListener16onFrameAvailableERKNS_10BufferItemE(void* _this, const void* item) asm("_ZN7android11BufferQueue21ProxyConsumerListener16onFrameAvailableERKNS_10BufferItemE");
@@ -305,7 +305,7 @@ void _ZN7android11BufferQueue21ProxyConsumerListener16onFrameAvailableERKNS_10Bu
     const char* sym = "_ZN7android11BufferQueue21ProxyConsumerListener16onFrameAvailableERKNS_10BufferItemE";
     void* fptr = resolve_sym_cached(sym);
     if (fptr) {
-        typedef void (fn_t)(void, const void*);
+        typedef void (*fn_t)(void*, const void*);
         fn_t fn = reinterpret_cast<fn_t>(fptr);
         fn(_this, item);
         return;
@@ -319,7 +319,7 @@ void _ZN7android11BufferQueue21ProxyConsumerListener15onFrameReplacedERKNS_10Buf
     const char* sym = "_ZN7android11BufferQueue21ProxyConsumerListener15onFrameReplacedERKNS_10BufferItemE";
     void* fptr = resolve_sym_cached(sym);
     if (fptr) {
-        typedef void (fn_t)(void, const void*);
+        typedef void (*fn_t)(void*, const void*);
         fn_t fn = reinterpret_cast<fn_t>(fptr);
         fn(_this, item);
         return;
@@ -333,7 +333,7 @@ void _ZN7android11BufferQueue21ProxyConsumerListener17onBuffersReleasedEv(void* 
     const char* sym = "_ZN7android11BufferQueue21ProxyConsumerListener17onBuffersReleasedEv";
     void* fptr = resolve_sym_cached(sym);
     if (fptr) {
-        typedef void (fn_t)(void);
+        typedef void (*fn_t)(void*);
         fn_t fn = reinterpret_cast<fn_t>(fptr);
         fn(_this);
         return;
@@ -347,7 +347,7 @@ void _ZN7android11BufferQueue21ProxyConsumerListener23onSidebandStreamChangedEv(
     const char* sym = "_ZN7android11BufferQueue21ProxyConsumerListener23onSidebandStreamChangedEv";
     void* fptr = resolve_sym_cached(sym);
     if (fptr) {
-        typedef void (fn_t)(void);
+        typedef void (*fn_t)(void*);
         fn_t fn = reinterpret_cast<fn_t>(fptr);
         fn(_this);
         return;
@@ -361,7 +361,7 @@ void _ZN7android11BufferQueue21ProxyConsumerListenerC1ERKNS_2wpINS_16ConsumerLis
     const char* sym = "_ZN7android11BufferQueue21ProxyConsumerListenerC1ERKNS_2wpINS_16ConsumerListenerEEE";
     void* fptr = resolve_sym_cached(sym);
     if (fptr) {
-        typedef void (fn_t)(void, const void*);
+        typedef void (*fn_t)(void*, const void*);
         fn_t fn = reinterpret_cast<fn_t>(fptr);
         fn(_this, wp);
         return;
@@ -376,7 +376,7 @@ void _ZN7android11BufferQueue21ProxyConsumerListenerC2ERKNS_2wpINS_16ConsumerLis
     const char* sym = "_ZN7android11BufferQueue21ProxyConsumerListenerC2ERKNS_2wpINS_16ConsumerListenerEEE";
     void* fptr = resolve_sym_cached(sym);
     if (fptr) {
-        typedef void (fn_t)(void, const void*);
+        typedef void (*fn_t)(void*, const void*);
         fn_t fn = reinterpret_cast<fn_t>(fptr);
         fn(_this, wp);
         return;
@@ -391,7 +391,7 @@ void _ZN7android11BufferQueue21ProxyConsumerListenerD0Ev(void* _this)
     const char* sym = "_ZN7android11BufferQueue21ProxyConsumerListenerD0Ev";
     void* fptr = resolve_sym_cached(sym);
     if (fptr) {
-        typedef void (fn_t)(void);
+        typedef void (*fn_t)(void*);
         fn_t fn = reinterpret_cast<fn_t>(fptr);
         fn(_this);
         return;
@@ -405,7 +405,7 @@ void _ZN7android11BufferQueue21ProxyConsumerListenerD1Ev(void* _this)
     const char* sym = "_ZN7android11BufferQueue21ProxyConsumerListenerD1Ev";
     void* fptr = resolve_sym_cached(sym);
     if (fptr) {
-        typedef void (fn_t)(void);
+        typedef void (*fn_t)(void*);
         fn_t fn = reinterpret_cast<fn_t>(fptr);
         fn(_this);
         return;
@@ -419,7 +419,7 @@ void _ZN7android11BufferQueue21ProxyConsumerListenerD2Ev(void* _this)
     const char* sym = "_ZN7android11BufferQueue21ProxyConsumerListenerD2Ev";
     void* fptr = resolve_sym_cached(sym);
     if (fptr) {
-        typedef void (fn_t)(void);
+        typedef void (*fn_t)(void*);
         fn_t fn = reinterpret_cast<fn_t>(fptr);
         fn(_this);
         return;
@@ -433,7 +433,7 @@ void _ZN7android19BufferQueueConsumerC2ERKNS_2spINS_15BufferQueueCoreEEE(void* _
     const char* sym = "_ZN7android19BufferQueueConsumerC2ERKNS_2spINS_15BufferQueueCoreEEE";
     void* fptr = resolve_sym_cached(sym);
     if (fptr) {
-        typedef void (fn_t)(void, const void*);
+        typedef void (*fn_t)(void*, const void*);
         fn_t fn = reinterpret_cast<fn_t>(fptr);
         fn(_this, sp);
         return;
@@ -448,7 +448,7 @@ void _ZN7android19BufferQueueConsumerD2Ev(void* _this)
     const char* sym = "_ZN7android19BufferQueueConsumerD2Ev";
     void* fptr = resolve_sym_cached(sym);
     if (fptr) {
-        typedef void (fn_t)(void);
+        typedef void (*fn_t)(void*);
         fn_t fn = reinterpret_cast<fn_t>(fptr);
         fn(_this);
         return;
@@ -462,7 +462,7 @@ void _ZN7android19BufferQueueConsumerD1Ev(void* _this)
     const char* sym = "_ZN7android19BufferQueueConsumerD1Ev";
     void* fptr = resolve_sym_cached(sym);
     if (fptr) {
-        typedef void (fn_t)(void);
+        typedef void (*fn_t)(void*);
         fn_t fn = reinterpret_cast<fn_t>(fptr);
         fn(_this);
         return;
@@ -476,7 +476,7 @@ void _ZN7android19BufferQueueProducerC1ERKNS_2spINS_15BufferQueueCoreEEE(void* _
     const char* sym = "_ZN7android19BufferQueueProducerC1ERKNS_2spINS_15BufferQueueCoreEEE";
     void* fptr = resolve_sym_cached(sym);
     if (fptr) {
-        typedef void (fn_t)(void, const void*);
+        typedef void (*fn_t)(void*, const void*);
         fn_t fn = reinterpret_cast<fn_t>(fptr);
         fn(_this, sp);
         return;
@@ -491,7 +491,7 @@ void _ZN7android19BufferQueueProducerD2Ev(void* _this)
     const char* sym = "_ZN7android19BufferQueueProducerD2Ev";
     void* fptr = resolve_sym_cached(sym);
     if (fptr) {
-        typedef void (fn_t)(void);
+        typedef void (*fn_t)(void*);
         fn_t fn = reinterpret_cast<fn_t>(fptr);
         fn(_this);
         return;
@@ -505,7 +505,7 @@ void _ZN7android19BufferQueueProducerD1Ev(void* _this)
     const char* sym = "_ZN7android19BufferQueueProducerD1Ev";
     void* fptr = resolve_sym_cached(sym);
     if (fptr) {
-        typedef void (fn_t)(void);
+        typedef void (*fn_t)(void*);
         fn_t fn = reinterpret_cast<fn_t>(fptr);
         fn(_this);
         return;
@@ -519,7 +519,7 @@ void _ZN7android15BufferQueueCoreC1ERKNS_2spINS_19IGraphicBufferAllocEEE(void* _
     const char* sym = "_ZN7android15BufferQueueCoreC1ERKNS_2spINS_19IGraphicBufferAllocEEE";
     void* fptr = resolve_sym_cached(sym);
     if (fptr) {
-        typedef void (fn_t)(void, const void*);
+        typedef void (*fn_t)(void*, const void*);
         fn_t fn = reinterpret_cast<fn_t>(fptr);
         fn(_this, sp);
         return;
@@ -534,7 +534,7 @@ void _ZN7android15BufferQueueCoreC2ERKNS_2spINS_19IGraphicBufferAllocEEE(void* _
     const char* sym = "_ZN7android15BufferQueueCoreC2ERKNS_2spINS_19IGraphicBufferAllocEEE";
     void* fptr = resolve_sym_cached(sym);
     if (fptr) {
-        typedef void (fn_t)(void, const void*);
+        typedef void (*fn_t)(void*, const void*);
         fn_t fn = reinterpret_cast<fn_t>(fptr);
         fn(_this, sp);
         return;
@@ -543,8 +543,8 @@ void _ZN7android15BufferQueueCoreC2ERKNS_2spINS_19IGraphicBufferAllocEEE(void* _
     memset(_this, 0, sizeof(void*));
     return;
 }
-}
-attribute((constructor)) static void shim_init(void)
+} // extern "C"
+__attribute__((constructor)) static void shim_init(void)
 {
     void* h = resolve_host_lib();
     if (h) {
@@ -556,4 +556,3 @@ attribute((constructor)) static void shim_init(void)
     void* gles = dlopen("libGLESv2.so", RTLD_NOW | RTLD_GLOBAL);
     mylog("shim_init: libEGL=%p libGLESv2=%p", eg, gles);
 }
-
