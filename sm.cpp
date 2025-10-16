@@ -21,8 +21,8 @@
 #include <errno.h>
 #include <wchar.h>
 
-// Forward declarations
 namespace android {
+
 class IBinder;
 class IInterface;
 class BBinder;
@@ -40,187 +40,6 @@ struct Point;
 typedef int status_t;
 class RefBase;
 class BpRefBase;
-}
-
-namespace android {
-
-native_handle* native_handle_create(int numFds, int numInts);
-void native_handle_delete(native_handle* h);
-
-struct native_handle {
-    int version;
-    int numFds;
-    int numInts;
-    int data[0];
-};
-
-native_handle* native_handle_create(int numFds, int numInts) {
-    size_t size = sizeof(native_handle) + sizeof(int) * (numFds + numInts);
-    native_handle* h = (native_handle*)malloc(size);
-    if (h) {
-        h->version = sizeof(native_handle);
-        h->numFds = numFds;
-        h->numInts = numInts;
-    }
-    return h;
-}
-
-void native_handle_delete(native_handle* h) {
-    if (h) free(h);
-}
-
-struct ANativeWindowBuffer {}; // Stub
-
-struct android_ycbcr {
-    void* y;
-    void* cb;
-    void* cr;
-    uint32_t ystride;
-    uint32_t cstride;
-    uint32_t chroma_step;
-};
-
-struct Point {
-    int32_t x, y;
-    Point() : x(0), y(0) {}
-};
-
-template <typename T>
-class sp {
-    T* m_ptr;
-public:
-    sp() : m_ptr(nullptr) {}
-    sp(T* ptr) : m_ptr(ptr) {}
-    sp(const sp& other) : m_ptr(other.m_ptr) {} // Simplified, no refcount
-    ~sp() {} // No delete, stub
-    T* operator->() const { return m_ptr; }
-    T& operator*() const { return *m_ptr; }
-    bool operator!() const { return m_ptr == nullptr; }
-    operator bool() const { return m_ptr != nullptr; }
-};
-
-template <typename T>
-class wp {
-    T* m_ptr;
-public:
-    wp() : m_ptr(nullptr) {}
-    wp(T* ptr) : m_ptr(ptr) {}
-    wp(const wp& other) : m_ptr(other.m_ptr) {}
-    ~wp() {}
-};
-
-struct RefBase {
-    virtual ~RefBase() {}
-    virtual void onFirstRef() {}
-    virtual void onLastWeakRef(const void*) {}
-    virtual void onLastStrongRef(const void*) {}
-    virtual bool onIncStrongAttempted(uint32_t, const void*) { return true; }
-    RefBase() {}
-    int decStrong(const void*) const { return 0; }
-    int incStrong(const void*) const { return 0; }
-    struct weakref_type {
-        void trackMe(bool, bool) {}
-        void printRefs() const {}
-    };
-    weakref_type* getWeakRefs() const { return nullptr; }
-    int getStrongCount() const { return 1; }
-};
-
-struct IInterface : public RefBase {
-    virtual ~IInterface() {}
-};
-
-struct IBinder : public RefBase {
-    virtual ~IBinder() {}
-    virtual BBinder* localBinder() { return nullptr; }
-    virtual BpBinder* remoteBinder() { return nullptr; }
-    virtual sp<IInterface> queryLocalInterface(const String16&) { return sp<IInterface>(nullptr); }
-    static bool checkSubclass(const void*) { return true; }
-    struct DeathRecipient {
-        virtual ~DeathRecipient() {}
-    };
-};
-
-struct BBinder : public IBinder {
-    virtual int onTransact(uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags) { return 0; }
-    virtual int pingBinder() { return 0; }
-    virtual bool isBinderAlive() const { return true; }
-    virtual String16 getInterfaceDescriptor() const { return String16(""); }
-    virtual int transact(uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags) { return 0; }
-    virtual status_t linkToDeath(const sp<IBinder::DeathRecipient>&, void*, uint32_t) { return 0; }
-    virtual status_t unlinkToDeath(const wp<IBinder::DeathRecipient>&, void*, uint32_t, wp<IBinder::DeathRecipient>*) { return 0; }
-    virtual BBinder* localBinder() { return this; }
-    virtual void attachObject(const void*, void*, void*, void (*)(const void*, void*, void*)) {}
-    virtual void* findObject(const void*) const { return nullptr; }
-    virtual void detachObject(const void*) {}
-    virtual int dump(int fd, const Vector<String16>& args) { return 0; }
-    BBinder() {}
-};
-
-struct BpBinder : public IBinder {}; // Stub
-
-struct BpRefBase : public RefBase {
-    BpRefBase(const sp<IBinder>& o) {}
-    virtual ~BpRefBase() {}
-    virtual void onFirstRef() {}
-    virtual void onLastStrongRef(const void*) {}
-    virtual bool onIncStrongAttempted(uint32_t, const void*) { return true; }
-};
-
-template <typename INTERFACE>
-struct BnInterface : public INTERFACE, public BBinder {
-    virtual String16 getInterfaceDescriptor() const { return INTERFACE::getInterfaceDescriptor(); }
-};
-
-template <typename INTERFACE>
-struct BpInterface : public INTERFACE, public BpRefBase {
-    BpInterface(const sp<IBinder>& remote) : BpRefBase(remote) {}
-};
-
-struct String8 {
-    char* mString;
-    String8() : mString(nullptr) {}
-    String8(const char* s) {
-        if (s) {
-            mString = strdup(s);
-        } else {
-            mString = nullptr;
-        }
-    }
-    ~String8() { free(mString); }
-    String8(const String8& other) : mString(other.mString ? strdup(other.mString) : nullptr) {}
-    String8& operator=(const String8& other) {
-        if (this != &other) {
-            free(mString);
-            mString = other.mString ? strdup(other.mString) : nullptr;
-        }
-        return *this;
-    }
-    const char* string() const { return mString ? mString : ""; }
-    size_t length() const { return mString ? strlen(mString) : 0; }
-    void append(const char* s) {
-        if (!s) return;
-        size_t len = length();
-        size_t slen = strlen(s);
-        char* newStr = (char*)realloc(mString, len + slen + 1);
-        if (newStr) {
-            memcpy(newStr + len, s, slen + 1);
-            mString = newStr;
-        }
-    }
-    void setTo(const char* s) {
-        free(mString);
-        mString = s ? strdup(s) : nullptr;
-    }
-    void appendFormat(const char* fmt, ...) {
-        va_list args;
-        va_start(args, fmt);
-        char buf[1024];
-        vsnprintf(buf, sizeof(buf), fmt, args);
-        va_end(args);
-        append(buf);
-    }
-};
 
 struct String16 {
     uint16_t* mString;
@@ -331,6 +150,182 @@ struct Parcel {
     bool checkInterface(IBinder* binder) const { return true; }
 };
 
+struct native_handle {
+    int version;
+    int numFds;
+    int numInts;
+    int data[0];
+};
+
+native_handle* native_handle_create(int numFds, int numInts) {
+    size_t size = sizeof(native_handle) + sizeof(int) * (numFds + numInts);
+    native_handle* h = (native_handle*)malloc(size);
+    if (h) {
+        h->version = sizeof(native_handle);
+        h->numFds = numFds;
+        h->numInts = numInts;
+    }
+    return h;
+}
+
+void native_handle_delete(native_handle* h) {
+    if (h) free(h);
+}
+
+struct ANativeWindowBuffer {};
+
+struct android_ycbcr {
+    void* y;
+    void* cb;
+    void* cr;
+    uint32_t ystride;
+    uint32_t cstride;
+    uint32_t chroma_step;
+};
+
+struct Point {
+    int32_t x, y;
+    Point() : x(0), y(0) {}
+    Point(int32_t x_, int32_t y_) : x(x_), y(y_) {}
+};
+
+template <typename T>
+class sp {
+    T* m_ptr;
+public:
+    sp() : m_ptr(nullptr) {}
+    sp(T* ptr) : m_ptr(ptr) {}
+    sp(const sp& other) : m_ptr(other.m_ptr) {}
+    ~sp() {}
+    T* operator->() const { return m_ptr; }
+    T& operator*() const { return *m_ptr; }
+    bool operator!() const { return m_ptr == nullptr; }
+    operator bool() const { return m_ptr != nullptr; }
+};
+
+template <typename T>
+class wp {
+    T* m_ptr;
+public:
+    wp() : m_ptr(nullptr) {}
+    wp(T* ptr) : m_ptr(ptr) {}
+    wp(const wp& other) : m_ptr(other.m_ptr) {}
+    ~wp() {}
+};
+
+struct String8 {
+    char* mString;
+    String8() : mString(nullptr) {}
+    String8(const char* s) {
+        if (s) {
+            mString = strdup(s);
+        } else {
+            mString = nullptr;
+        }
+    }
+    ~String8() { free(mString); }
+    String8(const String8& other) : mString(other.mString ? strdup(other.mString) : nullptr) {}
+    String8& operator=(const String8& other) {
+        if (this != &other) {
+            free(mString);
+            mString = other.mString ? strdup(other.mString) : nullptr;
+        }
+        return *this;
+    }
+    const char* string() const { return mString ? mString : ""; }
+    size_t length() const { return mString ? strlen(mString) : 0; }
+    void append(const char* s) {
+        if (!s) return;
+        size_t len = length();
+        size_t slen = strlen(s);
+        char* newStr = (char*)realloc(mString, len + slen + 1);
+        if (newStr) {
+            memcpy(newStr + len, s, slen + 1);
+            mString = newStr;
+        }
+    }
+    void setTo(const char* s) {
+        free(mString);
+        mString = s ? strdup(s) : nullptr;
+    }
+    void appendFormat(const char* fmt, ...) {
+        va_list args;
+        va_start(args, fmt);
+        char buf[1024];
+        vsnprintf(buf, sizeof(buf), fmt, args);
+        va_end(args);
+        append(buf);
+    }
+};
+
+struct RefBase {
+    virtual ~RefBase() {}
+    virtual void onFirstRef() {}
+    virtual void onLastWeakRef(const void*) {}
+    virtual void onLastStrongRef(const void*) {}
+    virtual bool onIncStrongAttempted(uint32_t, const void*) { return true; }
+    RefBase() {}
+    int decStrong(const void*) const { return 0; }
+    int incStrong(const void*) const { return 0; }
+    struct weakref_type {
+        void trackMe(bool, bool) {}
+        void printRefs() const {}
+    };
+    weakref_type* getWeakRefs() const { return nullptr; }
+    int getStrongCount() const { return 1; }
+};
+
+struct IInterface : public RefBase {
+    virtual ~IInterface() {}
+};
+
+struct IBinder : public RefBase {
+    virtual ~IBinder() {}
+    virtual BBinder* localBinder() { return nullptr; }
+    virtual BpBinder* remoteBinder() { return nullptr; }
+    virtual sp<IInterface> queryLocalInterface(const String16&) { return sp<IInterface>(nullptr); }
+    static bool checkSubclass(const void*) { return true; }
+    struct DeathRecipient {
+        virtual ~DeathRecipient() {}
+    };
+};
+
+struct BBinder : public IBinder {
+    virtual int onTransact(uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags) { return 0; }
+    virtual int pingBinder() { return 0; }
+    virtual bool isBinderAlive() const { return true; }
+    virtual String16 getInterfaceDescriptor() const { return String16(""); }
+    virtual int transact(uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags) { return 0; }
+    virtual status_t linkToDeath(const sp<IBinder::DeathRecipient>&, void*, uint32_t) { return 0; }
+    virtual status_t unlinkToDeath(const wp<IBinder::DeathRecipient>&, void*, uint32_t, wp<IBinder::DeathRecipient>*) { return 0; }
+    virtual BBinder* localBinder() { return this; }
+    virtual void attachObject(const void*, void*, void*, void (*)(const void*, void*, void*)) {}
+    virtual void* findObject(const void*) const { return nullptr; }
+    virtual void detachObject(const void*) {}
+    virtual int dump(int fd, const Vector<String16>& args) { return 0; }
+    BBinder() {}
+};
+
+struct BpBinder : public IBinder {};
+
+struct BpRefBase : public RefBase {
+    BpRefBase(const sp<IBinder>& o) {}
+    virtual ~BpRefBase() {}
+    virtual void onFirstRef() {}
+    virtual void onLastStrongRef(const void*) {}
+    virtual bool onIncStrongAttempted(uint32_t, const void*) { return true; }
+};
+
+template <typename INTERFACE>
+struct BnInterface : public INTERFACE, public BBinder {
+    virtual String16 getInterfaceDescriptor() const { return INTERFACE::getInterfaceDescriptor(); }
+};
+
+template <typename INTERFACE>
+struct BpInterface : public INTERFACE, public BpRefBase {
+    BpInterface(const sp<IBinder>& remote) : BpRefBase(remote) {}
+};
+
 struct Rect {
     int32_t left, top, right, bottom;
     Rect() : left(0), top(0), right(0), bottom(0) {}
@@ -347,6 +342,9 @@ struct Rect {
         if (left > other.left) return false;
         if (top < other.top) return true;
         return false;
+    }
+    bool operator==(const Rect& other) const {
+        return left == other.left && top == other.top && right == other.right && bottom == other.bottom;
     }
     Rect operator+(const Point& p) const { Rect r = *this; r.offsetBy(p.x, p.y); return r; }
     Rect operator-(const Point& p) const { Rect r = *this; r.offsetBy(-p.x, -p.y); return r; }
@@ -406,7 +404,7 @@ struct Region {
     String8 dump(const char* what, uint32_t flags) const { return String8("dump"); }
     void dump(String8& out, const char* what, uint32_t flags) const { out.append("dump"); }
     bool contains(const Point& p) const { return false; }
-    bool contains(int x, int y) const { return contains(Point{x,y}); }
+    bool contains(int x, int y) const { return contains(Point(x,y)); }
     uint32_t* getArray(uint32_t* count) const { if (count) *count = mRects.size(); return nullptr; }
     Region merge(const Rect& r) const { Region res = *this; res.orSelf(r); return res; }
     Region merge(const Region& other) const { Region res = *this; res.orSelf(other); return res; }
@@ -499,7 +497,7 @@ struct GraphicBuffer : public RefBase {
     native_handle* handle;
     GraphicBuffer() : width(0), height(0), format(0), usage(0), stride(0), handle(nullptr) {}
     GraphicBuffer(uint32_t w, uint32_t h, int32_t f, uint32_t u) : width(w), height(h), format(f), usage(u), stride(0), handle(nullptr) {}
-    GraphicBuffer(uint32_t w, uint32_t h, int32_t f, uint32_t u, uint32_t s, native_handle* h, bool keep) : width(w), height(h), format(f), usage(u), stride(s), handle(h) {}
+    GraphicBuffer(uint32_t w, uint32_t in_h, int32_t f, uint32_t u, uint32_t s, native_handle* h, bool keep) : width(w), height(in_h), format(f), usage(u), stride(s), handle(h) {}
     GraphicBuffer(ANativeWindowBuffer* buf, bool keep) {}
     ~GraphicBuffer() { if (handle) native_handle_delete(handle); }
     int reallocate(uint32_t w, uint32_t h, int32_t f, uint32_t u) { return 0; }
@@ -582,9 +580,15 @@ struct OccupancyTracker {
     struct Segment {};
 };
 
+struct Parcelable {
+    virtual int writeToParcel(Parcel* p) const = 0;
+    virtual int readFromParcel(const Parcel* p) = 0;
+    virtual ~Parcelable() {}
+};
+
 struct HdrCapabilities : public Parcelable {
-    int writeToParcel(Parcel* p) const { return 0; }
-    int readFromParcel(const Parcel* p) { return 0; }
+    int writeToParcel(Parcel* p) const override { return 0; }
+    int readFromParcel(const Parcel* p) override { return 0; }
 };
 
 struct ComposerState {};
@@ -712,61 +716,19 @@ struct GlobalResolvers {
     bool resolved = false;
     void* libgui = nullptr;
     void* libui = nullptr;
-    // Function pointers...
     void resolve() {
         std::lock_guard<std::mutex> lock(mutex);
         if (resolved) return;
         resolved = true;
-        libgui = open_libgui();
-        libui = open_libui();
-        if (libgui) {
-            // dlsym...
-        }
-        if (libui) {
-            // dlsym...
-        }
+        libgui = dlopen("/system/lib/libgui.so", RTLD_LAZY | RTLD_LOCAL);
+        if (!libgui) libgui = dlopen("/system/lib64/libgui.so", RTLD_LAZY | RTLD_LOCAL);
+        if (!libgui) libgui = dlopen("libgui.so", RTLD_LAZY | RTLD_LOCAL);
+        libui = dlopen("/system/lib/libui.so", RTLD_LAZY | RTLD_LOCAL);
+        if (!libui) libui = dlopen("/system/lib64/libui.so", RTLD_LAZY | RTLD_LOCAL);
+        if (!libui) libui = dlopen("libui.so", RTLD_LAZY | RTLD_LOCAL);
     }
 };
 
 static GlobalResolvers g_resolvers;
 
-// extern "C" ...
-}
-
-static void* open_libgui() {
-    static std::atomic<void*> handle{nullptr};
-    void* h = handle.load(std::memory_order_acquire);
-    if (h) return h;
-    static pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
-    pthread_mutex_lock(&m);
-    h = handle.load(std::memory_order_relaxed);
-    if (h) {
-        pthread_mutex_unlock(&m);
-        return h;
-    }
-    h = dlopen("/system/lib/libgui.so", RTLD_LAZY | RTLD_LOCAL);
-    if (!h) h = dlopen("/system/lib64/libgui.so", RTLD_LAZY | RTLD_LOCAL);
-    if (!h) h = dlopen("libgui.so", RTLD_LAZY | RTLD_LOCAL);
-    handle.store(h, std::memory_order_release);
-    pthread_mutex_unlock(&m);
-    return h;
-}
-
-static void* open_libui() {
-    static std::atomic<void*> handle{nullptr};
-    void* h = handle.load(std::memory_order_acquire);
-    if (h) return h;
-    static pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
-    pthread_mutex_lock(&m);
-    h = handle.load(std::memory_order_relaxed);
-    if (h) {
-        pthread_mutex_unlock(&m);
-        return h;
-    }
-    h = dlopen("/system/lib/libui.so", RTLD_LAZY | RTLD_LOCAL);
-    if (!h) h = dlopen("/system/lib64/libui.so", RTLD_LAZY | RTLD_LOCAL);
-    if (!h) h = dlopen("libui.so", RTLD_LAZY | RTLD_LOCAL);
-    handle.store(h, std::memory_order_release);
-    pthread_mutex_unlock(&m);
-    return h;
-}
+} // namespace shim
