@@ -19,11 +19,7 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <errno.h>
-#include <wchar.h>
-
-namespace android {
-
-class IBinder;
+#include <wchar.h>namespace android {class IBinder;
 class IInterface;
 class BBinder;
 class BpBinder;
@@ -39,9 +35,25 @@ struct android_ycbcr;
 struct Point;
 typedef int status_t;
 class RefBase;
-class BpRefBase;
-
-struct String16 {
+class BpRefBase;template <typename T> class sp {
+    T* m_ptr;
+public:
+    sp() : m_ptr(nullptr) {}
+    sp(T* ptr) : m_ptr(ptr) {}
+    sp(const sp& other) : m_ptr(other.m_ptr) {}
+    ~sp() {}
+    T* operator->() const { return m_ptr; }
+    T& operator*() const { return *m_ptr; }
+    bool operator!() const { return m_ptr == nullptr; }
+    operator bool() const { return m_ptr != nullptr; }
+};template <typename T> class wp {
+    T* m_ptr;
+public:
+    wp() : m_ptr(nullptr) {}
+    wp(T* ptr) : m_ptr(ptr) {}
+    wp(const wp& other) : m_ptr(other.m_ptr) {}
+    ~wp() {}
+};struct String16 {
     uint16_t* mString;
     String16() : mString(nullptr) {}
     String16(const char* s) {
@@ -58,9 +70,66 @@ struct String16 {
     }
     ~String16() { free(mString); }
     size_t size() const { return mString ? wcslen((wchar_t*)mString) : 0; }
-};
-
-struct Parcel {
+};struct String8 {
+    char* mString;
+    String8() : mString(nullptr) {}
+    String8(const char* s) {
+        if (s) {
+            mString = strdup(s);
+        } else {
+            mString = nullptr;
+        }
+    }
+    ~String8() { free(mString); }
+    String8(const String8& other) : mString(other.mString ? strdup(other.mString) : nullptr) {}
+    String8& operator=(const String8& other) {
+        if (this != &other) {
+            free(mString);
+            mString = other.mString ? strdup(other.mString) : nullptr;
+        }
+        return this;
+    }
+    const char string() const { return mString ? mString : ""; }
+    size_t length() const { return mString ? strlen(mString) : 0; }
+    void append(const char* s) {
+        if (!s) return;
+        size_t len = length();
+        size_t slen = strlen(s);
+        char* newStr = (char*)realloc(mString, len + slen + 1);
+        if (newStr) {
+            memcpy(newStr + len, s, slen + 1);
+            mString = newStr;
+        }
+    }
+    void setTo(const char* s) {
+        free(mString);
+        mString = s ? strdup(s) : nullptr;
+    }
+    void appendFormat(const char* fmt, ...) {
+        va_list args;
+        va_start(args, fmt);
+        char buf[1024];
+        vsnprintf(buf, sizeof(buf), fmt, args);
+        va_end(args);
+        append(buf);
+    }
+};struct native_handle {
+    int version;
+    int numFds;
+    int numInts;
+    int data[0];
+};native_handle* native_handle_create(int numFds, int numInts) {
+    size_t size = sizeof(native_handle) + sizeof(int) * (numFds + numInts);
+    native_handle* h = (native_handle*)malloc(size);
+    if (h) {
+        h->version = sizeof(native_handle);
+        h->numFds = numFds;
+        h->numInts = numInts;
+    }
+    return h;
+}void native_handle_delete(native_handle* h) {
+    if (h) free(h);
+}struct Parcel {
     uint8_t* mData;
     size_t mDataSize;
     size_t mDataPos;
@@ -148,117 +217,46 @@ struct Parcel {
         const_cast<Parcel*>(this)->mDataPos += sizeof(float);
     }
     bool checkInterface(IBinder* binder) const { return true; }
-};
-
-struct native_handle {
-    int version;
-    int numFds;
-    int numInts;
-    int data[0];
-};
-
-native_handle* native_handle_create(int numFds, int numInts) {
-    size_t size = sizeof(native_handle) + sizeof(int) * (numFds + numInts);
-    native_handle* h = (native_handle*)malloc(size);
-    if (h) {
-        h->version = sizeof(native_handle);
-        h->numFds = numFds;
-        h->numInts = numInts;
-    }
-    return h;
-}
-
-void native_handle_delete(native_handle* h) {
-    if (h) free(h);
-}
-
-struct ANativeWindowBuffer {};
-
-struct android_ycbcr {
+};struct ANativeWindowBuffer {};struct android_ycbcr {
     void* y;
     void* cb;
     void* cr;
     uint32_t ystride;
     uint32_t cstride;
     uint32_t chroma_step;
-};
-
-struct Point {
+};struct Point {
     int32_t x, y;
     Point() : x(0), y(0) {}
     Point(int32_t x_, int32_t y_) : x(x_), y(y_) {}
-};
-
-template <typename T>
-class sp {
-    T* m_ptr;
-public:
-    sp() : m_ptr(nullptr) {}
-    sp(T* ptr) : m_ptr(ptr) {}
-    sp(const sp& other) : m_ptr(other.m_ptr) {}
-    ~sp() {}
-    T* operator->() const { return m_ptr; }
-    T& operator*() const { return *m_ptr; }
-    bool operator!() const { return m_ptr == nullptr; }
-    operator bool() const { return m_ptr != nullptr; }
-};
-
-template <typename T>
-class wp {
-    T* m_ptr;
-public:
-    wp() : m_ptr(nullptr) {}
-    wp(T* ptr) : m_ptr(ptr) {}
-    wp(const wp& other) : m_ptr(other.m_ptr) {}
-    ~wp() {}
-};
-
-struct String8 {
-    char* mString;
-    String8() : mString(nullptr) {}
-    String8(const char* s) {
-        if (s) {
-            mString = strdup(s);
-        } else {
-            mString = nullptr;
-        }
-    }
-    ~String8() { free(mString); }
-    String8(const String8& other) : mString(other.mString ? strdup(other.mString) : nullptr) {}
-    String8& operator=(const String8& other) {
-        if (this != &other) {
-            free(mString);
-            mString = other.mString ? strdup(other.mString) : nullptr;
-        }
-        return *this;
-    }
-    const char* string() const { return mString ? mString : ""; }
-    size_t length() const { return mString ? strlen(mString) : 0; }
-    void append(const char* s) {
-        if (!s) return;
-        size_t len = length();
-        size_t slen = strlen(s);
-        char* newStr = (char*)realloc(mString, len + slen + 1);
-        if (newStr) {
-            memcpy(newStr + len, s, slen + 1);
-            mString = newStr;
-        }
-    }
-    void setTo(const char* s) {
-        free(mString);
-        mString = s ? strdup(s) : nullptr;
-    }
-    void appendFormat(const char* fmt, ...) {
-        va_list args;
-        va_start(args, fmt);
-        char buf[1024];
-        vsnprintf(buf, sizeof(buf), fmt, args);
-        va_end(args);
-        append(buf);
-    }
-};
-
-struct RefBase {
+};struct VectorImpl {
+    void* mArray;
+    size_t mCount;
+    size_t mCapacity;
+    uint32_t mItemSize;
+    uint32_t mFlags;
+    VectorImpl(size_t itemSize, uint32_t flags) : mArray(nullptr), mCount(0), mCapacity(0), mItemSize(itemSize), mFlags(flags) {}
+    VectorImpl(const VectorImpl& other) : mArray(nullptr), mCount(0), mCapacity(0), mItemSize(other.mItemSize), mFlags(other.mFlags) { appendVector(other); }
+    ~VectorImpl() { free(mArray); }
+    VectorImpl& operator=(const VectorImpl& other) { clear(); appendVector(other); return this; }
+    void editArrayImpl() { return mArray; }
+    void resize(size_t newCount) { mCount = newCount; }
+    void appendVector(const VectorImpl& other) {}
+    void add(const void* item) {}
+    void clear() { mCount = 0; }
+    void insertAt(const void* item, size_t index, size_t num) {}
+};template <typename T>
+struct Vector : public VectorImpl {
+    Vector() : VectorImpl(sizeof(T), 0) {}
+    void do_destroy(void* array, size_t count) const {}
+    void do_construct(void* array, size_t count) const {}
+    void do_move_forward(void* dst, const void* src, size_t count) const { memmove(dst, src, count * sizeof(T)); }
+    void do_move_backward(void* dst, const void* src, size_t count) const { memmove(dst, src, count * sizeof(T)); }
+    void do_copy(void* dst, const void* src, size_t count) const { memcpy(dst, src, count * sizeof(T)); }
+    void do_splat(void* dst, const void* item, size_t count) const {}
+};template <typename T>
+struct SortedVector : public Vector<T> {
+    void do_compare(const void* a, const void* b) const {}
+};struct RefBase {
     virtual ~RefBase() {}
     virtual void onFirstRef() {}
     virtual void onLastWeakRef(const void*) {}
@@ -273,13 +271,9 @@ struct RefBase {
     };
     weakref_type* getWeakRefs() const { return nullptr; }
     int getStrongCount() const { return 1; }
-};
-
-struct IInterface : public RefBase {
+};struct IInterface : public RefBase {
     virtual ~IInterface() {}
-};
-
-struct IBinder : public RefBase {
+};struct IBinder : public RefBase {
     virtual ~IBinder() {}
     virtual BBinder* localBinder() { return nullptr; }
     virtual BpBinder* remoteBinder() { return nullptr; }
@@ -288,45 +282,33 @@ struct IBinder : public RefBase {
     struct DeathRecipient {
         virtual ~DeathRecipient() {}
     };
-};
-
-struct BBinder : public IBinder {
+};struct BBinder : public IBinder {
     virtual int onTransact(uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags) { return 0; }
     virtual int pingBinder() { return 0; }
     virtual bool isBinderAlive() const { return true; }
     virtual String16 getInterfaceDescriptor() const { return String16(""); }
     virtual int transact(uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags) { return 0; }
-    virtual status_t linkToDeath(const sp<IBinder::DeathRecipient>&, void*, uint32_t) { return 0; }
-    virtual status_t unlinkToDeath(const wp<IBinder::DeathRecipient>&, void*, uint32_t, wp<IBinder::DeathRecipient>*) { return 0; }
-    virtual BBinder* localBinder() { return this; }
-    virtual void attachObject(const void*, void*, void*, void (*)(const void*, void*, void*)) {}
+    virtual status_t linkToDeath(const spIBinder::DeathRecipient&, void*, uint32_t) { return 0; }
+    virtual status_t unlinkToDeath(const wpIBinder::DeathRecipient&, void*, uint32_t, wpIBinder::DeathRecipient) { return 0; }
+    virtual BBinder localBinder() { return this; }
+    virtual void attachObject(const void*, void*, void*, void ()(const void, void*, void*)) {}
     virtual void* findObject(const void*) const { return nullptr; }
     virtual void detachObject(const void*) {}
     virtual int dump(int fd, const Vector<String16>& args) { return 0; }
     BBinder() {}
-};
-
-struct BpBinder : public IBinder {};
-
-struct BpRefBase : public RefBase {
+};struct BpBinder : public IBinder {};struct BpRefBase : public RefBase {
     BpRefBase(const sp<IBinder>& o) {}
     virtual ~BpRefBase() {}
     virtual void onFirstRef() {}
     virtual void onLastStrongRef(const void*) {}
     virtual bool onIncStrongAttempted(uint32_t, const void*) { return true; }
-};
-
-template <typename INTERFACE>
+};template <typename INTERFACE>
 struct BnInterface : public INTERFACE, public BBinder {
     virtual String16 getInterfaceDescriptor() const { return INTERFACE::getInterfaceDescriptor(); }
-};
-
-template <typename INTERFACE>
+};template <typename INTERFACE>
 struct BpInterface : public INTERFACE, public BpRefBase {
     BpInterface(const sp<IBinder>& remote) : BpRefBase(remote) {}
-};
-
-struct Rect {
+};struct Rect {
     int32_t left, top, right, bottom;
     Rect() : left(0), top(0), right(0), bottom(0) {}
     Rect(int32_t l, int32_t t, int32_t r, int32_t b) : left(l), top(t), right(r), bottom(b) {}
@@ -352,18 +334,14 @@ struct Rect {
     Rect transform(uint32_t, int, int) const { return *this; }
     static const Rect EMPTY_RECT;
     static const Rect INVALID_RECT;
-};
-
-const Rect Rect::EMPTY_RECT = Rect(0,0,0,0);
-const Rect Rect::INVALID_RECT = Rect(-1,-1,-1,-1);
-
-struct Region {
+};const Rect Rect::EMPTY_RECT = Rect(0,0,0,0);
+const Rect Rect::INVALID_RECT = Rect(-1,-1,-1,-1);struct Region {
     std::vector<Rect> mRects;
     Region() {}
     Region(const Rect& r) { mRects.push_back(r); }
     Region(const Region& other) : mRects(other.mRects) {}
     ~Region() {}
-    Region& operator=(const Region& other) { mRects = other.mRects; return *this; }
+    Region& operator=(const Region& other) { mRects = other.mRects; return this; }
     void clear() { mRects.clear(); }
     void set(const Rect& r) { mRects.clear(); mRects.push_back(r); }
     void set(int w, int h) { set(Rect(0,0,w,h)); }
@@ -393,23 +371,23 @@ struct Region {
     void operationSelf(const Region& other, int op1, int op2, int op3) {}
     static void translate(Region& out, const Region& in, int dx, int dy) { out = in; out.translateSelf(dx, dy); }
     static void translate(Region& out, int dx, int dy) { out.translateSelf(dx, dy); }
-    void unflatten(const void* data, size_t len) {}
-    Region mergeExclusive(const Rect& r) const { Region res = *this; res.orSelf(r); return res; }
-    Region mergeExclusive(const Region& other) const { Region res = *this; res.orSelf(other); return res; }
-    Region mergeExclusive(const Region& other, int dx, int dy) const { Region res = *this; res.orSelf(other, dx, dy); return res; }
+    void unflatten(const void data, size_t len) {}
+    Region mergeExclusive(const Rect& r) const { Region res = this; res.orSelf(r); return res; }
+    Region mergeExclusive(const Region& other) const { Region res = this; res.orSelf(other); return res; }
+    Region mergeExclusive(const Region& other, int dx, int dy) const { Region res = this; res.orSelf(other, dx, dy); return res; }
     size_t getFlattenedSize() const { return mRects.size() * sizeof(Rect); }
     bool isTriviallyEqual(const Region& other) const { return mRects == other.mRects; }
-    const Rect* begin() const { return mRects.data(); }
-    const Rect* end() const { return mRects.data() + mRects.size(); }
-    String8 dump(const char* what, uint32_t flags) const { return String8("dump"); }
+    const Rect begin() const { return mRects.data(); }
+    const Rect end() const { return mRects.data() + mRects.size(); }
+    String8 dump(const char what, uint32_t flags) const { return String8("dump"); }
     void dump(String8& out, const char* what, uint32_t flags) const { out.append("dump"); }
     bool contains(const Point& p) const { return false; }
     bool contains(int x, int y) const { return contains(Point(x,y)); }
     uint32_t* getArray(uint32_t* count) const { if (count) *count = mRects.size(); return nullptr; }
     Region merge(const Rect& r) const { Region res = *this; res.orSelf(r); return res; }
     Region merge(const Region& other) const { Region res = *this; res.orSelf(other); return res; }
-    Region merge(const Region& other, int dx, int dy) const { Region res = *this; res.orSelf(other, dx, dy); return res; }
-    int flatten(void* buffer, size_t len) const { return 0; }
+    Region merge(const Region& other, int dx, int dy) const { Region res = this; res.orSelf(other, dx, dy); return res; }
+    int flatten(void buffer, size_t len) const { return 0; }
     Region subtract(const Rect& r) const { return *this; }
     Region subtract(const Region& other) const { return *this; }
     Region subtract(const Region& other, int dx, int dy) const { return *this; }
@@ -426,58 +404,16 @@ struct Region {
         virtual void operator()(const Rect&) = 0;
         virtual void flushSpan() = 0;
     };
-};
-
-const Region Region::INVALID_REGION = Region(Rect::INVALID_RECT);
-
-struct VectorImpl {
-    void* mArray;
-    size_t mCount;
-    size_t mCapacity;
-    uint32_t mItemSize;
-    uint32_t mFlags;
-    VectorImpl(size_t itemSize, uint32_t flags) : mArray(nullptr), mCount(0), mCapacity(0), mItemSize(itemSize), mFlags(flags) {}
-    VectorImpl(const VectorImpl& other) : mArray(nullptr), mCount(0), mCapacity(0), mItemSize(other.mItemSize), mFlags(other.mFlags) { appendVector(other); }
-    ~VectorImpl() { free(mArray); }
-    VectorImpl& operator=(const VectorImpl& other) { clear(); appendVector(other); return *this; }
-    void* editArrayImpl() { return mArray; }
-    void resize(size_t newCount) { mCount = newCount; }
-    void appendVector(const VectorImpl& other) {}
-    void add(const void* item) {}
-    void clear() { mCount = 0; }
-    void insertAt(const void* item, size_t index, size_t num) {}
-};
-
-template <typename T>
-struct Vector : public VectorImpl {
-    Vector() : VectorImpl(sizeof(T), 0) {}
-    void do_destroy(void* array, size_t count) const {}
-    void do_construct(void* array, size_t count) const {}
-    void do_move_forward(void* dst, const void* src, size_t count) const { memmove(dst, src, count * sizeof(T)); }
-    void do_move_backward(void* dst, const void* src, size_t count) const { memmove(dst, src, count * sizeof(T)); }
-    void do_copy(void* dst, const void* src, size_t count) const { memcpy(dst, src, count * sizeof(T)); }
-    void do_splat(void* dst, const void* item, size_t count) const {}
-};
-
-template <typename T>
-struct SortedVector : public Vector<T> {
-    void do_compare(const void* a, const void* b) const {}
-};
-
-struct FrameStats {
+};const Region Region::INVALID_REGION = Region(Rect::INVALID_RECT);struct FrameStats {
     void unflatten(const void*, size_t) {}
     bool isFixedSize() const { return false; }
     size_t getFlattenedSize() const { return 0; }
     int flatten(void*, size_t) const { return 0; }
-};
-
-struct BufferItem {
+};struct BufferItem {
     int getFdCount() const { return 0; }
     size_t getFlattenedSize() const { return 0; }
     int flatten(void*&, size_t&, int*&, size_t&) const { return 0; }
-};
-
-struct Fence {
+};struct Fence {
     int mFd;
     Fence() : mFd(-1) {}
     Fence(int fd) : mFd(fd) {}
@@ -488,9 +424,7 @@ struct Fence {
     int flatten(void*&, size_t&, int*&, size_t&) const { return 0; }
     void unflatten(const void*&, size_t&, const int*&, size_t&) {}
     int64_t getSignalTime() const { return 0; }
-};
-
-struct GraphicBuffer : public RefBase {
+};struct GraphicBuffer : public RefBase {
     uint32_t width, height;
     int32_t format;
     uint32_t usage, stride;
@@ -521,9 +455,7 @@ struct GraphicBuffer : public RefBase {
     int flatten(void*&, size_t&, int*&, size_t&) const { return 0; }
     int initCheck() const { return 0; }
     static void dumpAllocationsToSystemLog() {}
-};
-
-struct GraphicBufferMapper {
+};struct GraphicBufferMapper {
     static GraphicBufferMapper& get() { static GraphicBufferMapper instance; return instance; }
     int unlockAsync(const native_handle* handle, int* out) { return 0; }
     int lockAsyncYCbCr(const native_handle* handle, uint32_t usage, const Rect& rect, android_ycbcr* ycbcr, int fenceFd) { return 0; }
@@ -533,73 +465,41 @@ struct GraphicBufferMapper {
     int unlock(const native_handle* handle) { return 0; }
     int lockAsync(const native_handle* handle, uint32_t usage, const Rect& rect, void** vaddr, int fenceFd) { return 0; }
     int lockYCbCr(const native_handle* handle, uint32_t usage, const Rect& rect, android_ycbcr* ycbcr) { return 0; }
-};
-
-struct GraphicBufferAllocator {
+};struct GraphicBufferAllocator {
     static GraphicBufferAllocator& get() { static GraphicBufferAllocator instance; return instance; }
     static void dumpToSystemLog() {}
     int free(const native_handle* handle) { return 0; }
     int alloc(uint32_t w, uint32_t h, int32_t f, uint32_t u, const native_handle** outHandle, uint32_t* outStride) { return 0; }
-};
-
-struct IGraphicBufferConsumer : public IInterface {
+};struct IGraphicBufferConsumer : public IInterface {
     static const String16 descriptor;
     virtual String16 getInterfaceDescriptor() const { return descriptor; }
     IGraphicBufferConsumer() {}
     virtual ~IGraphicBufferConsumer() {}
-};
-
-const String16 IGraphicBufferConsumer::descriptor("android.IGraphicBufferConsumer");
-
-struct BnGraphicBufferConsumer : public BnInterface<IGraphicBufferConsumer> {
+};const String16 IGraphicBufferConsumer::descriptor("android.IGraphicBufferConsumer");struct BnGraphicBufferConsumer : public BnInterface<IGraphicBufferConsumer> {
     virtual int onTransact(uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags) { return 0; }
-};
-
-struct BpGraphicBufferConsumer : public BpInterface<IGraphicBufferConsumer> {
+};struct BpGraphicBufferConsumer : public BpInterface<IGraphicBufferConsumer> {
     BpGraphicBufferConsumer(const sp<IBinder>& remote) : BpInterface<IGraphicBufferConsumer>(remote) {}
     virtual ~BpGraphicBufferConsumer() {}
-};
-
-struct IDumpTunnel : public IInterface {
+};struct IDumpTunnel : public IInterface {
     static const String16 descriptor;
     virtual String16 getInterfaceDescriptor() const { return descriptor; }
-};
-
-const String16 IDumpTunnel::descriptor("android.IDumpTunnel");
-
-struct BnDumpTunnel : public BnInterface<IDumpTunnel> {
+};const String16 IDumpTunnel::descriptor("android.IDumpTunnel");struct BnDumpTunnel : public BnInterface<IDumpTunnel> {
     virtual int onTransact(uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags) { return 0; }
-};
-
-struct BpDumpTunnel : public BpInterface<IDumpTunnel> {
+};struct BpDumpTunnel : public BpInterface<IDumpTunnel> {
     BpDumpTunnel(const sp<IBinder>& remote) : BpInterface<IDumpTunnel>(remote) {}
     virtual ~BpDumpTunnel() {}
-};
-
-struct OccupancyTracker {
+};struct OccupancyTracker {
     struct Segment {};
-};
-
-struct Parcelable {
+};struct Parcelable {
     virtual int writeToParcel(Parcel* p) const = 0;
     virtual int readFromParcel(const Parcel* p) = 0;
     virtual ~Parcelable() {}
-};
-
-struct HdrCapabilities : public Parcelable {
+};struct HdrCapabilities : public Parcelable {
     int writeToParcel(Parcel* p) const override { return 0; }
     int readFromParcel(const Parcel* p) override { return 0; }
-};
-
-struct ComposerState {};
-
-struct DisplayState {};
-
-struct ComposerService {
+};struct ComposerState {};struct DisplayState {};struct ComposerService {
     static ComposerService& get() { static ComposerService instance; return instance; }
-};
-
-struct Composer {
+};struct Composer {
     static Composer& get() { static Composer instance; return instance; }
     sp<IBinder> createDisplay(const String8&) { return sp<IBinder>(nullptr); }
     void destroyDisplay(const sp<IBinder>&) {}
@@ -629,69 +529,43 @@ struct Composer {
     void setPosition(const sp<SurfaceComposerClient>&, const sp<IBinder>&, float, float) {}
     ComposerState getLayerStateLocked(const sp<SurfaceComposerClient>&, const sp<IBinder>&) { return ComposerState{}; }
     DisplayState getDisplayStateLocked(const sp<IBinder>&) { return DisplayState{}; }
-};
-
-struct SurfaceComposerClient : public RefBase {
+};struct SurfaceComposerClient : public RefBase {
     sp<IBinder> connection() const { return sp<IBinder>(nullptr); }
     status_t initCheck() const { return 0; }
     virtual ~SurfaceComposerClient() {}
-};
-
-struct SyncFeatures {
+};struct SyncFeatures {
     SyncFeatures() {}
     String8 toString() const { return String8(""); }
-};
-
-struct BufferQueueCore {};
-
-struct BufferQueueDebug {
+};struct BufferQueueCore {};struct BufferQueueDebug {
     virtual ~BufferQueueDebug() {}
-};
-
-struct BufferQueueMonitor {
+};struct BufferQueueMonitor {
     void dump(String8&, const char*) {}
     virtual ~BufferQueueMonitor() {}
-};
-
-struct GuiExtMonitor {};
-
-struct DumpTunnelHelper {
+};struct GuiExtMonitor {};struct DumpTunnelHelper {
     DumpTunnelHelper() {}
     virtual ~DumpTunnelHelper() {}
-};
-
-struct FreeModeDevice {
+};struct FreeModeDevice {
     void setScenario(const uint32_t&) {}
     void query(bool*) {}
     FreeModeDevice() {}
     virtual ~FreeModeDevice() {}
-};
-
-struct PerfServiceController {
+};struct PerfServiceController {
     int getCapInfo() { return 0; }
     void parseConfig(char*, std::vector<int>&) {}
     void assignConfig(const int&, const int&, const int&) {}
     void setCPUScenario(const bool&) {}
     PerfServiceController() {}
     virtual ~PerfServiceController() {}
-};
-
-struct RefreshRateControl {
+};struct RefreshRateControl {
     void setScenario(int, bool) {}
     RefreshRateControl() {}
     virtual ~RefreshRateControl() {}
-};
-
-struct GraphicBufferUtil {
+};struct GraphicBufferUtil {
     static void drawLine(const sp<GraphicBuffer>&, uint8_t, int, int, int) {}
-};
-
-struct CallStack {
+};struct CallStack {
     CallStack(const char*, int) {}
     ~CallStack() {}
-};
-
-template <typename T>
+};template <typename T>
 struct Singleton {
     static T& getInstance() { static T instance; return instance; }
     static bool hasInstance() { return true; }
@@ -699,25 +573,15 @@ struct Singleton {
     static T* sInstance;
     Singleton() {}
     ~Singleton() {}
-};
-
-template <typename T>
-pthread_mutex_t Singleton<T>::sLock = PTHREAD_MUTEX_INITIALIZER;
-
-template <typename T>
-T* Singleton<T>::sInstance = nullptr;
-
-} // namespace android
-
-namespace shim {
-
-struct GlobalResolvers {
+};template <typename T>
+pthread_mutex_t Singleton<T>::sLock = PTHREAD_MUTEX_INITIALIZER;template <typename T>
+T* Singleton<T>::sInstance = nullptr;} // namespace androidnamespace shim {struct GlobalResolvers {
     std::mutex mutex;
     bool resolved = false;
     void* libgui = nullptr;
     void* libui = nullptr;
     void resolve() {
-        std::lock_guard<std::mutex> lock(mutex);
+        std::lock_guardstd::mutex lock(mutex);
         if (resolved) return;
         resolved = true;
         libgui = dlopen("/system/lib/libgui.so", RTLD_LAZY | RTLD_LOCAL);
@@ -727,8 +591,4 @@ struct GlobalResolvers {
         if (!libui) libui = dlopen("/system/lib64/libui.so", RTLD_LAZY | RTLD_LOCAL);
         if (!libui) libui = dlopen("libui.so", RTLD_LAZY | RTLD_LOCAL);
     }
-};
-
-static GlobalResolvers g_resolvers;
-
-} // namespace shim
+};static GlobalResolvers g_resolvers;} // namespace shim
