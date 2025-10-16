@@ -33,7 +33,7 @@ LOCAL_MODULE := libshim_gui_ui
 LOCAL_MODULE_TAGS := optional
 LOCAL_SRC_FILES := sm.cpp
 LOCAL_CPPFLAGS := -fPIC -std=gnu++11
-LOCAL_LDLIBS := -ldl -lc++_static
+LOCAL_LDLIBS := -ldl -latomic -lc++_static -lm
 LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE_CLASS := SHARED_LIBRARIES
 LOCAL_MODULE_SUFFIX := .so
