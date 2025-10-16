@@ -31,7 +31,6 @@ include $(BUILD_SHARED_LIBRARY)
 include $(CLEAR_VARS)
 LOCAL_MODULE := libshim3
 LOCAL_SRC_FILES := shim3.cpp
-LOCAL_CFLAGS := -fPIC -DANDROID -O2
 LOCAL_CPPFLAGS := -fPIC -std=gnu++11 -DANDROID -O2 -Wall -Wno-unused-parameter -Wno-missing-field-initializers -std=c++11
 LOCAL_LDLIBS := -llog -ldl -lc++
 LOCAL_MODULE_TAGS := optional
