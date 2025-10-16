@@ -33,7 +33,6 @@ LOCAL_MODULE := libshim3
 LOCAL_SRC_FILES := shim3.cpp
 LOCAL_CPP_FEATURES := exceptions rtti
 LOCAL_CPPFLAGS += -std=c++17 -fexceptions -frtti -stdlib=libc++
-LOCAL_CFLAGS += -DANDROID -O2 -Wall -Wno-unused-parameter
 LOCAL_STATIC_LIBRARIES += c++_static
 LOCAL_LDFLAGS += -stdlib=libc++ -Wl,--whole-archive
 LOCAL_LDLIBS := -llog -ldl
