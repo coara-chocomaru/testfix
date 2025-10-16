@@ -32,8 +32,9 @@ include $(CLEAR_VARS)
 LOCAL_MODULE := libshim_gui_ui
 LOCAL_MODULE_TAGS := optional
 LOCAL_SRC_FILES := sm.cpp
-LOCAL_SHARED_LIBRARIES := libdl libc++ liblog
-LOCAL_CXXFLAGS := -std=c++17 -fvisibility=hidden
-LOCAL_VENDOR_MODULE := true
-LOCAL_32_BIT_ONLY := false
+LOCAL_CPPFLAGS := -fPIC -std=gnu++11 -D_GLIBCXX_USE_CXX11_ABI=1
+LOCAL_LDLIBS := -ldl -lpthread
+LOCAL_MODULE_TAGS := optional
+LOCAL_MODULE_CLASS := SHARED_LIBRARIES
+LOCAL_MODULE_SUFFIX := .so
 include $(BUILD_SHARED_LIBRARY)
