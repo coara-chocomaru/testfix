@@ -21,19 +21,31 @@
 #include <errno.h>
 #include <wchar.h>
 
-
+// Forward declarations
 namespace android {
 class IBinder;
+class IInterface;
+class BBinder;
+class BpBinder;
+class IGraphicBufferConsumer;
+class IDumpTunnel;
+class SurfaceComposerClient;
+class IGraphicBufferProducer;
 template <typename T> class sp;
 template <typename T> class wp;
 struct native_handle;
-native_handle* native_handle_create(int numFds, int numInts);
-void native_handle_delete(native_handle* h);
 struct ANativeWindowBuffer;
 struct android_ycbcr;
-typedef int status_t;
 struct Point;
+typedef int status_t;
+class RefBase;
+class BpRefBase;
 }
+
+namespace android {
+
+native_handle* native_handle_create(int numFds, int numInts);
+void native_handle_delete(native_handle* h);
 
 struct native_handle {
     int version;
@@ -56,6 +68,22 @@ native_handle* native_handle_create(int numFds, int numInts) {
 void native_handle_delete(native_handle* h) {
     if (h) free(h);
 }
+
+struct ANativeWindowBuffer {}; // Stub
+
+struct android_ycbcr {
+    void* y;
+    void* cb;
+    void* cr;
+    uint32_t ystride;
+    uint32_t cstride;
+    uint32_t chroma_step;
+};
+
+struct Point {
+    int32_t x, y;
+    Point() : x(0), y(0) {}
+};
 
 template <typename T>
 class sp {
@@ -81,25 +109,73 @@ public:
     ~wp() {}
 };
 
-struct ANativeWindowBuffer {}; // Stub
-
-struct android_ycbcr {
-    void* y;
-    void* cb;
-    void* cr;
-    uint32_t ystride;
-    uint32_t cstride;
-    uint32_t chroma_step;
+struct RefBase {
+    virtual ~RefBase() {}
+    virtual void onFirstRef() {}
+    virtual void onLastWeakRef(const void*) {}
+    virtual void onLastStrongRef(const void*) {}
+    virtual bool onIncStrongAttempted(uint32_t, const void*) { return true; }
+    RefBase() {}
+    int decStrong(const void*) const { return 0; }
+    int incStrong(const void*) const { return 0; }
+    struct weakref_type {
+        void trackMe(bool, bool) {}
+        void printRefs() const {}
+    };
+    weakref_type* getWeakRefs() const { return nullptr; }
+    int getStrongCount() const { return 1; }
 };
 
-struct Point {
-    int32_t x, y;
-    Point() : x(0), y(0) {}
+struct IInterface : public RefBase {
+    virtual ~IInterface() {}
 };
 
-namespace android {
+struct IBinder : public RefBase {
+    virtual ~IBinder() {}
+    virtual BBinder* localBinder() { return nullptr; }
+    virtual BpBinder* remoteBinder() { return nullptr; }
+    virtual sp<IInterface> queryLocalInterface(const String16&) { return sp<IInterface>(nullptr); }
+    static bool checkSubclass(const void*) { return true; }
+    struct DeathRecipient {
+        virtual ~DeathRecipient() {}
+    };
+};
 
-// Rest of the code with fixes
+struct BBinder : public IBinder {
+    virtual int onTransact(uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags) { return 0; }
+    virtual int pingBinder() { return 0; }
+    virtual bool isBinderAlive() const { return true; }
+    virtual String16 getInterfaceDescriptor() const { return String16(""); }
+    virtual int transact(uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags) { return 0; }
+    virtual status_t linkToDeath(const sp<IBinder::DeathRecipient>&, void*, uint32_t) { return 0; }
+    virtual status_t unlinkToDeath(const wp<IBinder::DeathRecipient>&, void*, uint32_t, wp<IBinder::DeathRecipient>*) { return 0; }
+    virtual BBinder* localBinder() { return this; }
+    virtual void attachObject(const void*, void*, void*, void (*)(const void*, void*, void*)) {}
+    virtual void* findObject(const void*) const { return nullptr; }
+    virtual void detachObject(const void*) {}
+    virtual int dump(int fd, const Vector<String16>& args) { return 0; }
+    BBinder() {}
+};
+
+struct BpBinder : public IBinder {}; // Stub
+
+struct BpRefBase : public RefBase {
+    BpRefBase(const sp<IBinder>& o) {}
+    virtual ~BpRefBase() {}
+    virtual void onFirstRef() {}
+    virtual void onLastStrongRef(const void*) {}
+    virtual bool onIncStrongAttempted(uint32_t, const void*) { return true; }
+};
+
+template <typename INTERFACE>
+struct BnInterface : public INTERFACE, public BBinder {
+    virtual String16 getInterfaceDescriptor() const { return INTERFACE::getInterfaceDescriptor(); }
+};
+
+template <typename INTERFACE>
+struct BpInterface : public INTERFACE, public BpRefBase {
+    BpInterface(const sp<IBinder>& remote) : BpRefBase(remote) {}
+};
 
 struct String8 {
     char* mString;
@@ -166,7 +242,6 @@ struct String16 {
 };
 
 struct Parcel {
-    // Simplified Parcel without full flattening support.
     uint8_t* mData;
     size_t mDataSize;
     size_t mDataPos;
@@ -190,7 +265,6 @@ struct Parcel {
         if (len) write(str.string(), len);
     }
     void writeNativeHandle(const native_handle* handle) {
-        // Stub: assume simple handle.
         if (handle) {
             writeInt32(handle->numFds);
             writeInt32(handle->numInts);
@@ -201,8 +275,7 @@ struct Parcel {
         }
     }
     void writeStrongBinder(const sp<IBinder>& binder) {
-        // Stub.
-        writeInt32(binder ? 1 : 0);
+        writeInt32(static_cast<bool>(binder) ? 1 : 0);
     }
     void writeInterfaceToken(const String16& token) {
         uint32_t len = token.size();
@@ -247,7 +320,6 @@ struct Parcel {
         return h;
     }
     sp<IBinder> readStrongBinder() const {
-        // Stub.
         readInt32();
         return sp<IBinder>(nullptr);
     }
@@ -256,7 +328,7 @@ struct Parcel {
         memcpy(val, mData + mDataPos, sizeof(float));
         const_cast<Parcel*>(this)->mDataPos += sizeof(float);
     }
-    bool checkInterface(IBinder* binder) const { return true; } // Stub
+    bool checkInterface(IBinder* binder) const { return true; }
 };
 
 struct Rect {
@@ -268,7 +340,6 @@ struct Rect {
     void offsetTo(int32_t x, int32_t y) { right = x + (right - left); bottom = y + (bottom - top); left = x; top = y; }
     bool intersect(const Rect& other, Rect* out) const {
         if (out) *out = *this;
-        // Simple intersect logic.
         return true;
     }
     bool operator<(const Rect& other) const {
@@ -279,8 +350,8 @@ struct Rect {
     }
     Rect operator+(const Point& p) const { Rect r = *this; r.offsetBy(p.x, p.y); return r; }
     Rect operator-(const Point& p) const { Rect r = *this; r.offsetBy(-p.x, -p.y); return r; }
-    void reduce(const Rect& other) { /* stub */ }
-    Rect transform(uint32_t, int, int) const { return *this; } // Stub
+    void reduce(const Rect& other) {}
+    Rect transform(uint32_t, int, int) const { return *this; }
     static const Rect EMPTY_RECT;
     static const Rect INVALID_RECT;
 };
@@ -289,7 +360,6 @@ const Rect Rect::EMPTY_RECT = Rect(0,0,0,0);
 const Rect Rect::INVALID_RECT = Rect(-1,-1,-1,-1);
 
 struct Region {
-    // Simplified Region as a vector of Rects.
     std::vector<Rect> mRects;
     Region() {}
     Region(const Rect& r) { mRects.push_back(r); }
@@ -300,32 +370,32 @@ struct Region {
     void set(const Rect& r) { mRects.clear(); mRects.push_back(r); }
     void set(int w, int h) { set(Rect(0,0,w,h)); }
     void set(uint32_t w, uint32_t h) { set(static_cast<int>(w), static_cast<int>(h)); }
-    void orSelf(const Rect& r) { mRects.push_back(r); } // Simplified
+    void orSelf(const Rect& r) { mRects.push_back(r); }
     void orSelf(const Region& other) { mRects.insert(mRects.end(), other.mRects.begin(), other.mRects.end()); }
-    void orSelf(const Region& other, int dx, int dy) { for (auto r : other.mRects) { r.offsetBy(dx, dy); orSelf(r); } }
-    void andSelf(const Rect& r) { /* stub */ }
-    void andSelf(const Region& other) { /* stub */ }
-    void andSelf(const Region& other, int dx, int dy) { /* stub */ }
-    void xorSelf(const Rect& r) { /* stub */ }
-    void xorSelf(const Region& other) { /* stub */ }
-    void xorSelf(const Region& other, int dx, int dy) { /* stub */ }
-    void subtractSelf(const Rect& r) { /* stub */ }
-    void subtractSelf(const Region& other) { /* stub */ }
-    void subtractSelf(const Region& other, int dx, int dy) { /* stub */ }
+    void orSelf(const Region& other, int dx, int dy) { for (auto r : other.mRects) { Rect rr = r; rr.offsetBy(dx, dy); orSelf(rr); } }
+    void andSelf(const Rect& r) {}
+    void andSelf(const Region& other) {}
+    void andSelf(const Region& other, int dx, int dy) {}
+    void xorSelf(const Rect& r) {}
+    void xorSelf(const Region& other) {}
+    void xorSelf(const Region& other, int dx, int dy) {}
+    void subtractSelf(const Rect& r) {}
+    void subtractSelf(const Region& other) {}
+    void subtractSelf(const Region& other, int dx, int dy) {}
     void translateSelf(int dx, int dy) { for (auto& r : mRects) r.offsetBy(dx, dy); }
-    void makeBoundsSelf() { /* stub */ }
+    void makeBoundsSelf() {}
     void addRectUnchecked(int l, int t, int r, int b) { mRects.push_back(Rect(l,t,r,b)); }
-    static void boolean_operation(int op, Region& out, const Region& a, const Rect& b) { /* stub */ out = a; }
-    static void boolean_operation(int op, Region& out, const Region& a, const Rect& b, int dx, int dy) { /* stub */ out = a; }
-    static void boolean_operation(int op, Region& out, const Region& a, const Region& b) { /* stub */ out = a; }
-    static void boolean_operation(int op, Region& out, const Region& a, const Region& b, int dx, int dy) { /* stub */ out = a; }
+    static void boolean_operation(int op, Region& out, const Region& a, const Rect& b) { out = a; }
+    static void boolean_operation(int op, Region& out, const Region& a, const Rect& b, int dx, int dy) { out = a; }
+    static void boolean_operation(int op, Region& out, const Region& a, const Region& b) { out = a; }
+    static void boolean_operation(int op, Region& out, const Region& a, const Region& b, int dx, int dy) { out = a; }
     static Region createTJunctionFreeRegion(const Region& r) { return r; }
-    void operationSelf(const Rect& r, int op) { /* stub */ }
-    void operationSelf(const Region& other, int op) { /* stub */ }
-    void operationSelf(const Region& other, int op1, int op2, int op3) { /* stub */ }
+    void operationSelf(const Rect& r, int op) {}
+    void operationSelf(const Region& other, int op) {}
+    void operationSelf(const Region& other, int op1, int op2, int op3) {}
     static void translate(Region& out, const Region& in, int dx, int dy) { out = in; out.translateSelf(dx, dy); }
     static void translate(Region& out, int dx, int dy) { out.translateSelf(dx, dy); }
-    void unflatten(const void* data, size_t len) { /* stub */ }
+    void unflatten(const void* data, size_t len) {}
     Region mergeExclusive(const Rect& r) const { Region res = *this; res.orSelf(r); return res; }
     Region mergeExclusive(const Region& other) const { Region res = *this; res.orSelf(other); return res; }
     Region mergeExclusive(const Region& other, int dx, int dy) const { Region res = *this; res.orSelf(other, dx, dy); return res; }
@@ -335,13 +405,13 @@ struct Region {
     const Rect* end() const { return mRects.data() + mRects.size(); }
     String8 dump(const char* what, uint32_t flags) const { return String8("dump"); }
     void dump(String8& out, const char* what, uint32_t flags) const { out.append("dump"); }
-    bool contains(const Point& p) const { return false; } // Stub
+    bool contains(const Point& p) const { return false; }
     bool contains(int x, int y) const { return contains(Point{x,y}); }
-    uint32_t* getArray(uint32_t* count) const { if (count) *count = mRects.size(); return nullptr; } // Stub
+    uint32_t* getArray(uint32_t* count) const { if (count) *count = mRects.size(); return nullptr; }
     Region merge(const Rect& r) const { Region res = *this; res.orSelf(r); return res; }
     Region merge(const Region& other) const { Region res = *this; res.orSelf(other); return res; }
     Region merge(const Region& other, int dx, int dy) const { Region res = *this; res.orSelf(other, dx, dy); return res; }
-    int flatten(void* buffer, size_t len) const { /* stub */ return 0; }
+    int flatten(void* buffer, size_t len) const { return 0; }
     Region subtract(const Rect& r) const { return *this; }
     Region subtract(const Region& other) const { return *this; }
     Region subtract(const Region& other, int dx, int dy) const { return *this; }
@@ -373,31 +443,30 @@ struct VectorImpl {
     ~VectorImpl() { free(mArray); }
     VectorImpl& operator=(const VectorImpl& other) { clear(); appendVector(other); return *this; }
     void* editArrayImpl() { return mArray; }
-    void resize(size_t newCount) { /* stub */ mCount = newCount; }
-    void appendVector(const VectorImpl& other) { /* stub */ }
-    void add(const void* item) { /* stub */ }
+    void resize(size_t newCount) { mCount = newCount; }
+    void appendVector(const VectorImpl& other) {}
+    void add(const void* item) {}
     void clear() { mCount = 0; }
-    void insertAt(const void* item, size_t index, size_t num) { /* stub */ }
+    void insertAt(const void* item, size_t index, size_t num) {}
 };
 
 template <typename T>
 struct Vector : public VectorImpl {
     Vector() : VectorImpl(sizeof(T), 0) {}
-    void do_destroy(void* array, size_t count) const { /* stub */ }
-    void do_construct(void* array, size_t count) const { /* stub */ }
+    void do_destroy(void* array, size_t count) const {}
+    void do_construct(void* array, size_t count) const {}
     void do_move_forward(void* dst, const void* src, size_t count) const { memmove(dst, src, count * sizeof(T)); }
     void do_move_backward(void* dst, const void* src, size_t count) const { memmove(dst, src, count * sizeof(T)); }
     void do_copy(void* dst, const void* src, size_t count) const { memcpy(dst, src, count * sizeof(T)); }
-    void do_splat(void* dst, const void* item, size_t count) const { /* stub */ }
+    void do_splat(void* dst, const void* item, size_t count) const {}
 };
 
 template <typename T>
 struct SortedVector : public Vector<T> {
-    void do_compare(const void* a, const void* b) const { /* stub */ }
+    void do_compare(const void* a, const void* b) const {}
 };
 
 struct FrameStats {
-    // Stub
     void unflatten(const void*, size_t) {}
     bool isFixedSize() const { return false; }
     size_t getFlattenedSize() const { return 0; }
@@ -405,7 +474,6 @@ struct FrameStats {
 };
 
 struct BufferItem {
-    // Stub
     int getFdCount() const { return 0; }
     size_t getFlattenedSize() const { return 0; }
     int flatten(void*&, size_t&, int*&, size_t&) const { return 0; }
@@ -420,37 +488,19 @@ struct Fence {
     int getFdCount() const { return 1; }
     size_t getFlattenedSize() const { return sizeof(int); }
     int flatten(void*&, size_t&, int*&, size_t&) const { return 0; }
-    void unflatten(const void*&, size_t&, const int*&, size_t&) { /* stub */ }
+    void unflatten(const void*&, size_t&, const int*&, size_t&) {}
     int64_t getSignalTime() const { return 0; }
 };
 
-struct RefBase {
-    virtual ~RefBase() {}
-    virtual void onFirstRef() {}
-    virtual void onLastWeakRef(const void*) {}
-    virtual void onLastStrongRef(const void*) {}
-    virtual bool onIncStrongAttempted(uint32_t, const void*) { return true; }
-    RefBase() {}
-    int decStrong(const void*) const { return 0; }
-    int incStrong(const void*) const { return 0; }
-    struct weakref_type {
-        void trackMe(bool, bool) {}
-        void printRefs() const {}
-    };
-    weakref_type* getWeakRefs() const { return nullptr; }
-    int getStrongCount() const { return 1; }
-};
-
 struct GraphicBuffer : public RefBase {
-    // Stub fields
     uint32_t width, height;
     int32_t format;
     uint32_t usage, stride;
     native_handle* handle;
     GraphicBuffer() : width(0), height(0), format(0), usage(0), stride(0), handle(nullptr) {}
-    GraphicBuffer(uint32_t w, uint32_t inHeight, int32_t f, uint32_t u) : width(w), height(inHeight), format(f), usage(u), stride(0), handle(nullptr) {}
-    GraphicBuffer(uint32_t w, uint32_t inHeight, int32_t f, uint32_t u, uint32_t s, native_handle* inHandle, bool keep) : width(w), height(inHeight), format(f), usage(u), stride(s), handle(inHandle) {}
-    GraphicBuffer(ANativeWindowBuffer* buf, bool keep) { /* stub */ }
+    GraphicBuffer(uint32_t w, uint32_t h, int32_t f, uint32_t u) : width(w), height(h), format(f), usage(u), stride(0), handle(nullptr) {}
+    GraphicBuffer(uint32_t w, uint32_t h, int32_t f, uint32_t u, uint32_t s, native_handle* h, bool keep) : width(w), height(h), format(f), usage(u), stride(s), handle(h) {}
+    GraphicBuffer(ANativeWindowBuffer* buf, bool keep) {}
     ~GraphicBuffer() { if (handle) native_handle_delete(handle); }
     int reallocate(uint32_t w, uint32_t h, int32_t f, uint32_t u) { return 0; }
     bool needsReallocation(uint32_t w, uint32_t h, int32_t f, uint32_t u) { return true; }
@@ -466,7 +516,7 @@ struct GraphicBuffer : public RefBase {
     int lockAsync(uint32_t usage, const Rect& rect, void** vaddr, int fenceFd) { return 0; }
     int lockYCbCr(uint32_t usage, android_ycbcr* ycbcr) { return 0; }
     int lockYCbCr(uint32_t usage, const Rect& rect, android_ycbcr* ycbcr) { return 0; }
-    void unflatten(const void*&, size_t&, const int*&, size_t&) { /* stub */ }
+    void unflatten(const void*&, size_t&, const int*&, size_t&) {}
     int getFdCount() const { return 0; }
     const ANativeWindowBuffer* getNativeBuffer() const { return nullptr; }
     size_t getFlattenedSize() const { return 0; }
@@ -476,7 +526,6 @@ struct GraphicBuffer : public RefBase {
 };
 
 struct GraphicBufferMapper {
-    // Singleton stub
     static GraphicBufferMapper& get() { static GraphicBufferMapper instance; return instance; }
     int unlockAsync(const native_handle* handle, int* out) { return 0; }
     int lockAsyncYCbCr(const native_handle* handle, uint32_t usage, const Rect& rect, android_ycbcr* ycbcr, int fenceFd) { return 0; }
@@ -489,60 +538,10 @@ struct GraphicBufferMapper {
 };
 
 struct GraphicBufferAllocator {
-    // Singleton stub
     static GraphicBufferAllocator& get() { static GraphicBufferAllocator instance; return instance; }
     static void dumpToSystemLog() {}
     int free(const native_handle* handle) { return 0; }
     int alloc(uint32_t w, uint32_t h, int32_t f, uint32_t u, const native_handle** outHandle, uint32_t* outStride) { return 0; }
-};
-
-struct IInterface : public RefBase {
-    virtual ~IInterface() {}
-};
-
-struct IBinder : public RefBase {
-    virtual ~IBinder() {}
-    virtual BBinder* localBinder() { return nullptr; }
-    virtual BpBinder* remoteBinder() { return nullptr; }
-    virtual sp<IInterface> queryLocalInterface(const String16&) { return sp<IInterface>(nullptr); }
-    static bool checkSubclass(const void*) { return true; }
-    struct DeathRecipient {
-        virtual ~DeathRecipient() {}
-    };
-};
-
-struct BBinder : public IBinder {
-    virtual int onTransact(uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags) { return 0; }
-    virtual int pingBinder() { return 0; }
-    virtual bool isBinderAlive() const { return true; }
-    virtual String16 getInterfaceDescriptor() const { return String16(""); }
-    virtual int transact(uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags) { return 0; }
-    virtual status_t linkToDeath(const sp<IBinder::DeathRecipient>&, void*, uint32_t) { return 0; }
-    virtual status_t unlinkToDeath(const wp<IBinder::DeathRecipient>&, void*, uint32_t, wp<IBinder::DeathRecipient>*) { return 0; }
-    virtual BBinder* localBinder() { return this; }
-    virtual void attachObject(const void*, void*, void*, void (*)(const void*, void*, void*)) {}
-    virtual void* findObject(const void*) const { return nullptr; }
-    virtual void detachObject(const void*) {}
-    virtual int dump(int fd, const Vector<String16>& args) { return 0; }
-    BBinder() {}
-};
-
-struct BpRefBase : public RefBase {
-    BpRefBase(const sp<IBinder>& o) {}
-    virtual ~BpRefBase() {}
-    virtual void onFirstRef() {}
-    virtual void onLastStrongRef(const void*) {}
-    virtual bool onIncStrongAttempted(uint32_t, const void*) { return true; }
-};
-
-template <typename INTERFACE>
-struct BnInterface : public INTERFACE, public BBinder {
-    virtual String16 getInterfaceDescriptor() const { return INTERFACE::getInterfaceDescriptor(); }
-};
-
-template <typename INTERFACE>
-struct BpInterface : public INTERFACE, public BpRefBase {
-    BpInterface(const sp<IBinder>& remote) : BpRefBase(remote) {}
 };
 
 struct IGraphicBufferConsumer : public IInterface {
@@ -580,32 +579,23 @@ struct BpDumpTunnel : public BpInterface<IDumpTunnel> {
 };
 
 struct OccupancyTracker {
-    struct Segment {
-        // Stub
-    };
+    struct Segment {};
 };
 
 struct HdrCapabilities : public Parcelable {
-    // Stub
     int writeToParcel(Parcel* p) const { return 0; }
     int readFromParcel(const Parcel* p) { return 0; }
 };
 
-struct ComposerState {
-    // Stub
-};
+struct ComposerState {};
 
-struct DisplayState {
-    // Stub
-};
+struct DisplayState {};
 
 struct ComposerService {
-    // Singleton stub
     static ComposerService& get() { static ComposerService instance; return instance; }
 };
 
 struct Composer {
-    // Singleton stub
     static Composer& get() { static Composer instance; return instance; }
     sp<IBinder> createDisplay(const String8&) { return sp<IBinder>(nullptr); }
     void destroyDisplay(const sp<IBinder>&) {}
@@ -648,12 +638,9 @@ struct SyncFeatures {
     String8 toString() const { return String8(""); }
 };
 
-struct BufferQueueCore {
-    // Stub
-};
+struct BufferQueueCore {};
 
 struct BufferQueueDebug {
-    // Stub
     virtual ~BufferQueueDebug() {}
 };
 
@@ -662,9 +649,7 @@ struct BufferQueueMonitor {
     virtual ~BufferQueueMonitor() {}
 };
 
-struct GuiExtMonitor {
-    // Stub
-};
+struct GuiExtMonitor {};
 
 struct DumpTunnelHelper {
     DumpTunnelHelper() {}
@@ -728,8 +713,6 @@ struct GlobalResolvers {
     void* libgui = nullptr;
     void* libui = nullptr;
     // Function pointers...
-    // (omitted for brevity, but same as before)
-
     void resolve() {
         std::lock_guard<std::mutex> lock(mutex);
         if (resolved) return;
@@ -737,15 +720,53 @@ struct GlobalResolvers {
         libgui = open_libgui();
         libui = open_libui();
         if (libgui) {
-            // dlsym calls...
+            // dlsym...
         }
         if (libui) {
-            // dlsym calls...
+            // dlsym...
         }
     }
 };
 
 static GlobalResolvers g_resolvers;
 
+// extern "C" ...
+}
 
-} // namespace shim
+static void* open_libgui() {
+    static std::atomic<void*> handle{nullptr};
+    void* h = handle.load(std::memory_order_acquire);
+    if (h) return h;
+    static pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
+    pthread_mutex_lock(&m);
+    h = handle.load(std::memory_order_relaxed);
+    if (h) {
+        pthread_mutex_unlock(&m);
+        return h;
+    }
+    h = dlopen("/system/lib/libgui.so", RTLD_LAZY | RTLD_LOCAL);
+    if (!h) h = dlopen("/system/lib64/libgui.so", RTLD_LAZY | RTLD_LOCAL);
+    if (!h) h = dlopen("libgui.so", RTLD_LAZY | RTLD_LOCAL);
+    handle.store(h, std::memory_order_release);
+    pthread_mutex_unlock(&m);
+    return h;
+}
+
+static void* open_libui() {
+    static std::atomic<void*> handle{nullptr};
+    void* h = handle.load(std::memory_order_acquire);
+    if (h) return h;
+    static pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
+    pthread_mutex_lock(&m);
+    h = handle.load(std::memory_order_relaxed);
+    if (h) {
+        pthread_mutex_unlock(&m);
+        return h;
+    }
+    h = dlopen("/system/lib/libui.so", RTLD_LAZY | RTLD_LOCAL);
+    if (!h) h = dlopen("/system/lib64/libui.so", RTLD_LAZY | RTLD_LOCAL);
+    if (!h) h = dlopen("libui.so", RTLD_LAZY | RTLD_LOCAL);
+    handle.store(h, std::memory_order_release);
+    pthread_mutex_unlock(&m);
+    return h;
+}
