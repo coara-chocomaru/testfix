@@ -24,6 +24,6 @@ include $(BUILD_SHARED_LIBRARY)
 include $(CLEAR_VARS)
 LOCAL_MODULE := libshim2
 LOCAL_SRC_FILES := shim2.c
-LOCAL_CPPFLAGS := -fPIC -std=gnu++11 -DANDROID -O2 -Wall -Wno-unused-parameter -Wno-missing-field-initializers
+LOCAL_CPPFLAGS := -fPIC -std=gnu++11 -DANDROID -O2 -Wall -Wno-unused-parameter -Wno-missing-field-initializers -stdlib=libc++
 LOCAL_LDLIBS := -llog -ldl
 include $(BUILD_SHARED_LIBRARY)
