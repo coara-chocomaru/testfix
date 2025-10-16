@@ -228,11 +228,6 @@ struct Vector : public VectorImpl {
     const T& operator[](size_t i) const { return *((T*)((char*)mArray + i * sizeof(T))); }
 };
 
-template <typename T>
-struct SortedVector : public Vector<T> {
-    void do_compare(const void* a, const void* b) const {}
-};
-
 struct Rect {
     int32_t left, top, right, bottom;
     Rect() : left(0), top(0), right(0), bottom(0) {}
@@ -264,20 +259,57 @@ struct Rect {
 const Rect Rect::EMPTY_RECT = Rect(0,0,0,0);
 const Rect Rect::INVALID_RECT = Rect(-1,-1,-1,-1);
 
+template<typename T>
+struct SimpleVector {
+    T* data_;
+    size_t size_;
+    size_t capacity_;
+    SimpleVector(): data_(nullptr), size_(0), capacity_(0) {}
+    ~SimpleVector() { free(data_); }
+    void push_back(const T& v) {
+        if (size_ + 1 > capacity_) {
+            size_t newcap = capacity_ ? capacity_ * 2 : 4;
+            T* n = (T*)realloc(data_, newcap * sizeof(T));
+            if (!n) return;
+            data_ = n;
+            capacity_ = newcap;
+        }
+        data_[size_++] = v;
+    }
+    void append(const SimpleVector& other) {
+        for (size_t i = 0; i < other.size_; ++i) push_back(other.data_[i]);
+    }
+    size_t size() const { return size_; }
+    const T* begin() const { return data_; }
+    const T* end() const { return data_ ? data_ + size_ : nullptr; }
+    void clear() { size_ = 0; }
+    void orSelf(const T& r) { push_back(r); }
+    void orSelf(const SimpleVector& other) { append(other); }
+    void orSelf(const SimpleVector& other, int dx, int dy) {
+        for (size_t i = 0; i < other.size_; ++i) {
+            T rr = other.data_[i];
+            rr.offsetBy(dx, dy);
+            push_back(rr);
+        }
+    }
+    const T& operator[](size_t i) const { return data_[i]; }
+    T& operator[](size_t i) { return data_[i]; }
+};
+
 struct Region {
-    std::vector<Rect> mRects;
+    SimpleVector<Rect> mRects;
     Region() {}
     Region(const Rect& r) { mRects.push_back(r); }
-    Region(const Region& other) : mRects(other.mRects) {}
+    Region(const Region& other) { mRects.append(other.mRects); }
     ~Region() {}
-    Region& operator=(const Region& other) { mRects = other.mRects; return *this; }
+    Region& operator=(const Region& other) { mRects.clear(); mRects.append(other.mRects); return *this; }
     void clear() { mRects.clear(); }
     void set(const Rect& r) { mRects.clear(); mRects.push_back(r); }
     void set(int w, int h) { set(Rect(0,0,w,h)); }
     void set(uint32_t w, uint32_t h) { set(static_cast<int>(w), static_cast<int>(h)); }
-    void orSelf(const Rect& r) { mRects.push_back(r); }
-    void orSelf(const Region& other) { mRects.insert(mRects.end(), other.mRects.begin(), other.mRects.end()); }
-    void orSelf(const Region& other, int dx, int dy) { for (auto r : other.mRects) { Rect rr = r; rr.offsetBy(dx, dy); orSelf(rr); } }
+    void orSelf(const Rect& r) { mRects.orSelf(r); }
+    void orSelf(const Region& other) { mRects.orSelf(other.mRects); }
+    void orSelf(const Region& other, int dx, int dy) { mRects.orSelf(other.mRects, dx, dy); }
     void andSelf(const Rect& r) {}
     void andSelf(const Region& other) {}
     void andSelf(const Region& other, int dx, int dy) {}
@@ -287,7 +319,7 @@ struct Region {
     void subtractSelf(const Rect& r) {}
     void subtractSelf(const Region& other) {}
     void subtractSelf(const Region& other, int dx, int dy) {}
-    void translateSelf(int dx, int dy) { for (auto& r : mRects) r.offsetBy(dx, dy); }
+    void translateSelf(int dx, int dy) { for (size_t i = 0; i < mRects.size(); ++i) mRects[i].offsetBy(dx, dy); }
     void makeBoundsSelf() {}
     void addRectUnchecked(int l, int t, int r, int b) { mRects.push_back(Rect(l,t,r,b)); }
     static void boolean_operation(int op, Region& out, const Region& a, const Rect& b) { out = a; }
@@ -305,14 +337,14 @@ struct Region {
     Region mergeExclusive(const Region& other) const { Region res = *this; res.orSelf(other); return res; }
     Region mergeExclusive(const Region& other, int dx, int dy) const { Region res = *this; res.orSelf(other, dx, dy); return res; }
     size_t getFlattenedSize() const { return mRects.size() * sizeof(Rect); }
-    bool isTriviallyEqual(const Region& other) const { return mRects == other.mRects; }
-    const Rect* begin() const { return mRects.data(); }
-    const Rect* end() const { return mRects.data() + mRects.size(); }
+    bool isTriviallyEqual(const Region& other) const { if (mRects.size() != other.mRects.size()) return false; for (size_t i = 0; i < mRects.size(); ++i) if (!(mRects[i] == other.mRects[i])) return false; return true; }
+    const Rect* begin() const { return mRects.begin(); }
+    const Rect* end() const { return mRects.end(); }
     String8 dump(const char* what, uint32_t flags) const { return String8("dump"); }
     void dump(String8& out, const char* what, uint32_t flags) const { out.append("dump"); }
     bool contains(const Point& p) const { return false; }
     bool contains(int x, int y) const { return contains(Point(x,y)); }
-    uint32_t* getArray(uint32_t* count) const { if (count) *count = mRects.size(); return nullptr; }
+    uint32_t* getArray(uint32_t* count) const { if (count) *count = static_cast<uint32_t>(mRects.size()); return nullptr; }
     Region merge(const Rect& r) const { Region res = *this; res.orSelf(r); return res; }
     Region merge(const Region& other) const { Region res = *this; res.orSelf(other); return res; }
     Region merge(const Region& other, int dx, int dy) const { Region res = *this; res.orSelf(other, dx, dy); return res; }
@@ -663,14 +695,18 @@ T* Singleton<T>::sInstance = nullptr;
 namespace shim {
 
 struct GlobalResolvers {
-    std::mutex mutex;
+    pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
     bool resolved = false;
     void* libgui = nullptr;
     void* libui = nullptr;
     void resolve() {
-        std::lock_guard<std::mutex> lock(mutex);
-        if (resolved) return;
+        pthread_mutex_lock(&mutex);
+        if (resolved) {
+            pthread_mutex_unlock(&mutex);
+            return;
+        }
         resolved = true;
+        pthread_mutex_unlock(&mutex);
         libgui = dlopen("/system/lib/libgui.so", RTLD_LAZY | RTLD_LOCAL);
         if (!libgui) libgui = dlopen("/system/lib64/libgui.so", RTLD_LAZY | RTLD_LOCAL);
         if (!libgui) libgui = dlopen("libgui.so", RTLD_LAZY | RTLD_LOCAL);
