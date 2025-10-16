@@ -27,13 +27,3 @@ LOCAL_SRC_FILES := shim2.cpp
 LOCAL_CPPFLAGS := -fPIC -std=gnu++11 -DANDROID -O2 -Wall -Wno-unused-parameter -Wno-missing-field-initializers
 LOCAL_LDLIBS := -llog -ldl
 include $(BUILD_SHARED_LIBRARY)
-
-include $(CLEAR_VARS)
-LOCAL_MODULE := libshim3
-LOCAL_SRC_FILES := shim3.cpp
-LOCAL_CPP_FEATURES := exceptions rtti
-LOCAL_CPPFLAGS += -std=c++17 -fexceptions -frtti -stdlib=libc++
-LOCAL_LDLIBS := -llog -ldl
-LOCAL_MODULE_TAGS := optional
-LOCAL_MODULE_CLASS := SHARED_LIBRARIES
-include $(BUILD_SHARED_LIBRARY)
