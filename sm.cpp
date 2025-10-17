@@ -1,7 +1,7 @@
-#include <stdint.h>
 #include <stddef.h>
-#include <cstdlib>
-#include <cstring>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
 #include <dlfcn.h>
 #include <string>
 #include <atomic>
@@ -260,7 +260,7 @@ extern "C" void _ZN7android13GraphicBufferC1Ejjij(void* _this, uint32 inWidth, u
         g_resolvers.ctor_nativebuf(_this, nullptr, false);
         return;
     }
-    std::memset(_this, 0, sizeof(void*));
+    ::memset(_this, 0, sizeof(void*));
 }
 
 extern "C" void _ZN7android13GraphicBufferC2Ejjij(void* _this, uint32 inWidth, uint32 inHeight, int32 inFormat, uint32 inUsage)
@@ -278,7 +278,7 @@ extern "C" void _ZN7android13GraphicBufferC2Ejjij(void* _this, uint32 inWidth, u
         g_resolvers.ctor_nativebuf(_this, nullptr, false);
         return;
     }
-    std::memset(_this, 0, sizeof(void*));
+    ::memset(_this, 0, sizeof(void*));
 }
 
 extern "C" void _ZN7android13GraphicBufferC1Ejjijy(void* _this, uint32 inWidth, uint32 inHeight, int32 inFormat, uint32 inUsage, unsigned char arg)
@@ -289,14 +289,14 @@ extern "C" void _ZN7android13GraphicBufferC1Ejjijy(void* _this, uint32 inWidth, 
         return;
     }
     if (g_resolvers.new_ctor_cstr) {
-        call_ctor_new_cstr(_this, inWidth, inHeight, inFormat, inUsage, "");
+        call_ctor_new_cstr(__this, inWidth, inHeight, inFormat, inUsage, "");
         return;
     }
     if (g_resolvers.ctor_nativebuf) {
         g_resolvers.ctor_nativebuf(_this, nullptr, false);
         return;
     }
-    std::memset(_this, 0, sizeof(void*));
+    ::memset(_this, 0, sizeof(void*));
 }
 
 extern "C" void _ZN7android13GraphicBufferC2Ejjijy(void* _this, uint32 inWidth, uint32 inHeight, int32 inFormat, uint32 inUsage, unsigned char arg)
@@ -314,7 +314,7 @@ extern "C" void _ZN7android13GraphicBufferC2Ejjijy(void* _this, uint32 inWidth, 
         g_resolvers.ctor_nativebuf(_this, nullptr, false);
         return;
     }
-    std::memset(_this, 0, sizeof(void*));
+    ::memset(_this, 0, sizeof(void*));
 }
 
 extern "C" void _ZN7android13GraphicBufferC1EjjijjP11native_handle(void* _this, uint32 inWidth, uint32 inHeight, int32 inFormat, uint32 inUsage, uint32 inStride, void* inHandle)
@@ -328,7 +328,7 @@ extern "C" void _ZN7android13GraphicBufferC1EjjijjP11native_handle(void* _this, 
         call_ctor_new_str(_this, inWidth, inHeight, inFormat, inUsage, std::string(""));
         return;
     }
-    std::memset(_this, 0, sizeof(void*));
+    ::memset(_this, 0, sizeof(void*));
 }
 
 extern "C" void _ZN7android13GraphicBufferC2EjjijjP11native_handle(void* _this, uint32 inWidth, uint32 inHeight, int32 inFormat, uint32 inUsage, uint32 inStride, void* inHandle)
@@ -342,7 +342,7 @@ extern "C" void _ZN7android13GraphicBufferC2EjjijjP11native_handle(void* _this, 
         call_ctor_new_str(_this, inWidth, inHeight, inFormat, inUsage, std::string(""));
         return;
     }
-    std::memset(_this, 0, sizeof(void*));
+    ::memset(_this, 0, sizeof(void*));
 }
 
 extern "C" void _ZN7android13GraphicBufferC1EP19ANativeWindowBufferb(void* _this, void* buf, bool b)
@@ -352,7 +352,7 @@ extern "C" void _ZN7android13GraphicBufferC1EP19ANativeWindowBufferb(void* _this
         g_resolvers.ctor_nativebuf(_this, buf, b);
         return;
     }
-    std::memset(_this, 0, sizeof(void*));
+    ::memset(_this, 0, sizeof(void*));
 }
 
 extern "C" void _ZN7android13GraphicBufferC2EP19ANativeWindowBufferb(void* _this, void* buf, bool b)
@@ -362,7 +362,7 @@ extern "C" void _ZN7android13GraphicBufferC2EP19ANativeWindowBufferb(void* _this
         g_resolvers.ctor_nativebuf(_this, buf, b);
         return;
     }
-    std::memset(_this, 0, sizeof(void*));
+    ::memset(_this, 0, sizeof(void*));
 }
 
 extern "C" void _ZN7android13GraphicBufferD1Ev(void* _this)
