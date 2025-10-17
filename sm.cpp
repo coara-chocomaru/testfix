@@ -393,19 +393,19 @@ extern "C" int _ZN7android18BufferQueueMonitor4dumpERNS_7String8EPKc(void* a, co
     return 0;
 }
 
-extern "C" int _ZN7android13GuiExtMonitorINS_18BufferQueueMonitorENS_2wpINS_15BufferQueueCoreEEEE4dumpERNS_7String8EPKc(void* a, const char* b)
+extern "C" void _ZN7android13GuiExtMonitorINS_18BufferQueueMonitorENS_2wpINS_15BufferQueueCoreEEEE4dumpERNS_7String8EPKc(void* a, const char* b)
 {
     ALOGW("GuiExtShim: GuiExtMonitor<BufferQueueMonitor>::dump intercepted");
     return 0;
 }
 
-extern "C" int _ZN7android13GuiExtMonitorINS_18BufferQueueMonitorENS_2wpINS_15BufferQueueCoreEEEE7monitorES4(void* a, void* b)
+extern "C" void _ZN7android13GuiExtMonitorINS_18BufferQueueMonitorENS_2wpINS_15BufferQueueCoreEEEE7monitorES4(void* a, void* b)
 {
     ALOGW("GuiExtShim: GuiExtMonitor<BufferQueueMonitor>::monitor intercepted");
     return 0;
 }
 
-extern "C" int _ZN7android13GuiExtMonitorINS_18BufferQueueMonitorENS_2wpINS_15BufferQueueCoreEEEE9unmonitorES4(void* a, void* b)
+extern "C" void _ZN7android13GuiExtMonitorINS_18BufferQueueMonitorENS_2wpINS_15BufferQueueCoreEEEE9unmonitorES4(void* a, void* b)
 {
     ALOGW("GuiExtShim: GuiExtMonitor<BufferQueueMonitor>::unmonitor intercepted");
     return 0;
@@ -423,13 +423,13 @@ extern "C" int _ZN7android14RefBaseMonitor4dumpERNS_7String8EPKc(void* a, const 
     return 0;
 }
 
-extern "C" int _ZN7android13GuiExtMonitorINS_14RefBaseMonitorEPNS_7RefBaseEE7monitorES3(void* a, void* b)
+extern "C" void _ZN7android13GuiExtMonitorINS_14RefBaseMonitorEPNS_7RefBaseEE7monitorES3(void* a, void* b)
 {
     ALOGW("GuiExtShim: GuiExtMonitor<RefBaseMonitor>::monitor intercepted");
     return 0;
 }
 
-extern "C" int _ZN7android13GuiExtMonitorINS_14RefBaseMonitorEPNS_7RefBaseEE4dumpERNS_7String8EPKc(void* a, const char* b)
+extern "C" void _ZN7android13GuiExtMonitorINS_14RefBaseMonitorEPNS_7RefBaseEE4dumpERNS_7String8EPKc(void* a, const char* b)
 {
     ALOGW("GuiExtShim: GuiExtMonitor<RefBaseMonitor>::dump intercepted");
     return 0;
