@@ -1,14 +1,36 @@
 #include <stddef.h>
 #include <stdint.h>
-#include <cstddef>
-#include <cstdint>
-#include <cstdlib>
-#include <cstring>
+#include <string.h>
+#include <stdlib.h>
 #include <dlfcn.h>
 #include <string>
 #include <atomic>
 #include <unistd.h>
 #include <pthread.h>
+
+#if !defined(_PTRDIFF_T) && !defined(_PTRDIFF_T_DEFINED) && !defined(_PTRDIFF_T_) && !defined(__PTRDIFF_T_DEFINED)
+typedef __PTRDIFF_TYPE__ ptrdiff_t;
+#endif
+
+#if !defined(_SIZE_T) && !defined(_SIZE_T_DEFINED) && !defined(_SIZE_T_) && !defined(__SIZE_T_DEFINED)
+typedef __SIZE_TYPE__ size_t;
+#endif
+
+#if !defined(_INTPTR_T) && !defined(_INTPTR_T_DEFINED) && !defined(__INTPTR_T_DEFINED)
+typedef __INTPTR_TYPE__ intptr_t;
+typedef __UINTPTR_TYPE__ uintptr_t;
+#endif
+
+#ifndef INT8_MAX
+typedef signed char int8_t;
+typedef short int16_t;
+typedef int int32_t;
+typedef long long int64_t;
+typedef unsigned char uint8_t;
+typedef unsigned short uint16_t;
+typedef unsigned int uint32_t;
+typedef unsigned long long uint64_t;
+#endif
 
 using uint32 = uint32_t;
 using int32 = int32_t;
