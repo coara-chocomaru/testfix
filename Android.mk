@@ -6,4 +6,7 @@ LOCAL_SRC_FILES := sm.cpp
 LOCAL_CPPFLAGS := -std=gnu++11 -fno-exceptions -fno-rtti -D_GLIBCXX_USE_CXX11_ABI=1 -DANDROID
 LOCAL_CFLAGS := -fPIC
 LOCAL_LDLIBS := -ldl
+ifeq ($(TARGET_ARCH_ABI),armeabi-v7a)
+    LOCAL_LDLIBS += -Wl,--whole-archive -lc++_static -Wl,--no-whole-archive -lc++abi
+endif
 include $(BUILD_SHARED_LIBRARY)
