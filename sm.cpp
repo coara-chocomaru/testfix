@@ -1,17 +1,14 @@
-#include <stddef.h>
-#include <stdint.h>
-#include <sys/types.h>
-#include <string.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <dlfcn.h>
-#include <pthread.h>
-#include <atomic>
-#include <string>
 
+#include <cstdint>
+#include <cstdlib>
+#include <cstring>
+#include <dlfcn.h>
+#include <string>
+#include <atomic>
+#include <unistd.h>
+#include <pthread.h>
 using uint32 = uint32_t;
 using int32 = int32_t;
-
 static void* open_libui()
 {
     static std::atomic<void*> handle{nullptr};
@@ -29,7 +26,6 @@ static void* open_libui()
     handle.store(h, std::memory_order_release);
     return h;
 }
-
 namespace shim {
 using ctor_new_str_t = void (*)(void*, uint32, uint32, int32, uint32, std::string const&);
 using ctor_new_cstr_t = void (*)(void*, uint32, uint32, int32, uint32, const char*);
@@ -207,9 +203,7 @@ struct Resolvers {
         }
     }
 };
-
 static Resolvers g_resolvers;
-
 extern "C" void _ZN7android13GraphicBufferC1Ejjij(void* _this, uint32 inWidth, uint32 inHeight, int32 inFormat, uint32 inUsage) asm("_ZN7android13GraphicBufferC1Ejjij");
 extern "C" void _ZN7android13GraphicBufferC2Ejjij(void* _this, uint32 inWidth, uint32 inHeight, int32 inFormat, uint32 inUsage) asm("_ZN7android13GraphicBufferC2Ejjij");
 extern "C" void _ZN7android13GraphicBufferC1Ejjijy(void* _this, uint32 inWidth, uint32 inHeight, int32 inFormat, uint32 inUsage, unsigned char arg) asm("_ZN7android13GraphicBufferC1Ejjijy");
@@ -231,21 +225,17 @@ extern "C" int _ZN7android13GraphicBuffer4lockEjRKNS_4RectEPPv(void* _this, unsi
 extern "C" int _ZN7android13GraphicBuffer6unlockEv(void* _this) asm("_ZN7android13GraphicBuffer6unlockEv");
 extern "C" void* _ZN7android13GraphicBuffer15getNativeBufferEv(void* _this) asm("_ZN7android13GraphicBuffer15getNativeBufferEv");
 extern "C" int _ZN7android13GraphicBuffer10getFdCountEv(void* _this) asm("_ZN7android13GraphicBuffer10getFdCountEv");
-
-static const std::string g_empty_string = std::string();
-
 static void call_ctor_new_str(void* _this, uint32 w, uint32 h, int32 f, uint32 u, const std::string& s)
 {
     if (!g_resolvers.new_ctor_str) return;
-    g_resolvers.new_ctor_str(_this, w, h, f, u, s.size()? s : g_empty_string);
+    g_resolvers.new_ctor_str(_this, w, h, f, u, s);
 }
-
 static void call_ctor_new_cstr(void* _this, uint32 w, uint32 h, int32 f, uint32 u, const char* s)
 {
     if (!g_resolvers.new_ctor_cstr) return;
-    g_resolvers.new_ctor_cstr(_this, w, h, f, u, s ? s : "");
+    std::string tmp = s ? s : "";
+    g_resolvers.new_ctor_cstr(_this, w, h, f, u, tmp.c_str());
 }
-
 extern "C" void _ZN7android13GraphicBufferC1Ejjij(void* _this, uint32 inWidth, uint32 inHeight, int32 inFormat, uint32 inUsage)
 {
     g_resolvers.resolve();
@@ -261,9 +251,8 @@ extern "C" void _ZN7android13GraphicBufferC1Ejjij(void* _this, uint32 inWidth, u
         g_resolvers.ctor_nativebuf(_this, nullptr, false);
         return;
     }
-    memset(_this, 0, sizeof(void*));
+    std::memset(_this, 0, sizeof(void*));
 }
-
 extern "C" void _ZN7android13GraphicBufferC2Ejjij(void* _this, uint32 inWidth, uint32 inHeight, int32 inFormat, uint32 inUsage)
 {
     g_resolvers.resolve();
@@ -279,9 +268,8 @@ extern "C" void _ZN7android13GraphicBufferC2Ejjij(void* _this, uint32 inWidth, u
         g_resolvers.ctor_nativebuf(_this, nullptr, false);
         return;
     }
-    memset(_this, 0, sizeof(void*));
+    std::memset(_this, 0, sizeof(void*));
 }
-
 extern "C" void _ZN7android13GraphicBufferC1Ejjijy(void* _this, uint32 inWidth, uint32 inHeight, int32 inFormat, uint32 inUsage, unsigned char arg)
 {
     g_resolvers.resolve();
@@ -297,9 +285,8 @@ extern "C" void _ZN7android13GraphicBufferC1Ejjijy(void* _this, uint32 inWidth, 
         g_resolvers.ctor_nativebuf(_this, nullptr, false);
         return;
     }
-    memset(_this, 0, sizeof(void*));
+    std::memset(_this, 0, sizeof(void*));
 }
-
 extern "C" void _ZN7android13GraphicBufferC2Ejjijy(void* _this, uint32 inWidth, uint32 inHeight, int32 inFormat, uint32 inUsage, unsigned char arg)
 {
     g_resolvers.resolve();
@@ -315,9 +302,8 @@ extern "C" void _ZN7android13GraphicBufferC2Ejjijy(void* _this, uint32 inWidth, 
         g_resolvers.ctor_nativebuf(_this, nullptr, false);
         return;
     }
-    memset(_this, 0, sizeof(void*));
+    std::memset(_this, 0, sizeof(void*));
 }
-
 extern "C" void _ZN7android13GraphicBufferC1EjjijjP11native_handle(void* _this, uint32 inWidth, uint32 inHeight, int32 inFormat, uint32 inUsage, uint32 inStride, void* inHandle)
 {
     g_resolvers.resolve();
@@ -329,9 +315,8 @@ extern "C" void _ZN7android13GraphicBufferC1EjjijjP11native_handle(void* _this, 
         call_ctor_new_str(_this, inWidth, inHeight, inFormat, inUsage, std::string(""));
         return;
     }
-    memset(_this, 0, sizeof(void*));
+    std::memset(_this, 0, sizeof(void*));
 }
-
 extern "C" void _ZN7android13GraphicBufferC2EjjijjP11native_handle(void* _this, uint32 inWidth, uint32 inHeight, int32 inFormat, uint32 inUsage, uint32 inStride, void* inHandle)
 {
     g_resolvers.resolve();
@@ -343,9 +328,8 @@ extern "C" void _ZN7android13GraphicBufferC2EjjijjP11native_handle(void* _this, 
         call_ctor_new_str(_this, inWidth, inHeight, inFormat, inUsage, std::string(""));
         return;
     }
-    memset(_this, 0, sizeof(void*));
+    std::memset(_this, 0, sizeof(void*));
 }
-
 extern "C" void _ZN7android13GraphicBufferC1EP19ANativeWindowBufferb(void* _this, void* buf, bool b)
 {
     g_resolvers.resolve();
@@ -353,9 +337,8 @@ extern "C" void _ZN7android13GraphicBufferC1EP19ANativeWindowBufferb(void* _this
         g_resolvers.ctor_nativebuf(_this, buf, b);
         return;
     }
-    memset(_this, 0, sizeof(void*));
+    std::memset(_this, 0, sizeof(void*));
 }
-
 extern "C" void _ZN7android13GraphicBufferC2EP19ANativeWindowBufferb(void* _this, void* buf, bool b)
 {
     g_resolvers.resolve();
@@ -363,9 +346,8 @@ extern "C" void _ZN7android13GraphicBufferC2EP19ANativeWindowBufferb(void* _this
         g_resolvers.ctor_nativebuf(_this, buf, b);
         return;
     }
-    memset(_this, 0, sizeof(void*));
+    std::memset(_this, 0, sizeof(void*));
 }
-
 extern "C" void _ZN7android13GraphicBufferD1Ev(void* _this)
 {
     g_resolvers.resolve();
@@ -374,7 +356,6 @@ extern "C" void _ZN7android13GraphicBufferD1Ev(void* _this)
         return;
     }
 }
-
 extern "C" void _ZN7android13GraphicBufferD2Ev(void* _this)
 {
     g_resolvers.resolve();
@@ -383,7 +364,6 @@ extern "C" void _ZN7android13GraphicBufferD2Ev(void* _this)
         return;
     }
 }
-
 extern "C" void _ZN7android13GraphicBuffer8initSizeEjjij(void* _this, uint32 w, uint32 h, int32 f, uint32 u)
 {
     g_resolvers.resolve();
@@ -396,7 +376,6 @@ extern "C" void _ZN7android13GraphicBuffer8initSizeEjjij(void* _this, uint32 w, 
         return;
     }
 }
-
 extern "C" void _ZN7android13GraphicBuffer8initSizeEjjijNSt3__112basic_stringIcNS1_11char_traitsIcEENS1_9allocatorIcEEEE(void* _this, uint32 w, uint32 h, int32 f, uint32 u, std::string const& s)
 {
     g_resolvers.resolve();
@@ -409,7 +388,6 @@ extern "C" void _ZN7android13GraphicBuffer8initSizeEjjijNSt3__112basic_stringIcN
         return;
     }
 }
-
 extern "C" void _ZN7android13GraphicBuffer10reallocateEjjij(void* _this, uint32 w, uint32 h, int32 f, uint32 u)
 {
     g_resolvers.resolve();
@@ -418,7 +396,6 @@ extern "C" void _ZN7android13GraphicBuffer10reallocateEjjij(void* _this, uint32 
         return;
     }
 }
-
 extern "C" void _ZN7android13GraphicBuffer11free_handleEv(void* _this)
 {
     g_resolvers.resolve();
@@ -427,7 +404,6 @@ extern "C" void _ZN7android13GraphicBuffer11free_handleEv(void* _this)
         return;
     }
 }
-
 extern "C" int _ZN7android13GraphicBuffer4lockEjPPv(void* _this, unsigned int usage, void** vaddr)
 {
     g_resolvers.resolve();
@@ -436,7 +412,6 @@ extern "C" int _ZN7android13GraphicBuffer4lockEjPPv(void* _this, unsigned int us
     }
     return -1;
 }
-
 extern "C" int _ZN7android13GraphicBuffer4lockEjRKNS_4RectEPPv(void* _this, unsigned int usage, void* rect, void** vaddr)
 {
     g_resolvers.resolve();
@@ -448,7 +423,6 @@ extern "C" int _ZN7android13GraphicBuffer4lockEjRKNS_4RectEPPv(void* _this, unsi
     }
     return -1;
 }
-
 extern "C" int _ZN7android13GraphicBuffer6unlockEv(void* _this)
 {
     g_resolvers.resolve();
@@ -457,7 +431,6 @@ extern "C" int _ZN7android13GraphicBuffer6unlockEv(void* _this)
     }
     return -1;
 }
-
 extern "C" void* _ZN7android13GraphicBuffer15getNativeBufferEv(void* _this)
 {
     g_resolvers.resolve();
@@ -466,7 +439,6 @@ extern "C" void* _ZN7android13GraphicBuffer15getNativeBufferEv(void* _this)
     }
     return nullptr;
 }
-
 extern "C" int _ZN7android13GraphicBuffer10getFdCountEv(void* _this)
 {
     g_resolvers.resolve();
@@ -475,5 +447,4 @@ extern "C" int _ZN7android13GraphicBuffer10getFdCountEv(void* _this)
     }
     return 0;
 }
-
 }
