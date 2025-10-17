@@ -1,8 +1,7 @@
 APP_ABI := armeabi-v7a arm64-v8a
-APP_PLATFORM := android-21
 APP_STL := c++_static
-APP_CPPFLAGS := -fPIC -std=gnu++17 -stdlib=libc++ -D_GNU_SOURCE -fexceptions -frtti -O2
-APP_LDFLAGS := -Wl,--exclude-libs,libgcc.a
+APP_CPPFLAGS := -fno-exceptions -fno-rtti -D_GLIBCXX_USE_CXX11_ABI=1
+APP_PLATFORM := android-21
 
 ifeq ($(TARGET_ARCH_ABI), arm64-v8a)
 APP_CPPFLAGS += -D__aarch64__ 
