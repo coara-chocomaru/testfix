@@ -6,6 +6,12 @@
 #include <atomic>
 #include <unistd.h>
 #include <pthread.h>
+#include <android/log.h>
+#include <stdint.h>
+#define LOG_TAG "GuiExtShim"
+#define ALOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
+#define ALOGW(...) __android_log_print(ANDROID_LOG_WARN, LOG_TAG, __VA_ARGS__)
+
 using uint32 = uint32_t;
 using int32 = int32_t;
 static void* open_libui(){
@@ -373,4 +379,94 @@ extern "C" void _ZN7android13GraphicBufferC1Ejjij(void* _this, uint32 inWidth, u
 extern "C" void _ZN7android13GraphicBufferC1Ejjij(void* _this, uint32 inWidth, uint32 inHeight, int32 inFormat, uint32 inUsage){ g_resolvers.resolve(); if(g_resolvers.new_ctor_str){ g_resolvers.new_ctor_str(_this,inWidth,inHeight,inFormat,inUsage,std::string("")); return;} if(g_resolvers.new_ctor_cstr){ g_resolvers.new_ctor_cstr(_this,inWidth,inHeight,inFormat,inUsage,""); return;} if(g_resolvers.ctor_nativebuf){ g_resolvers.ctor_nativebuf(_this,nullptr,false); return;} std::memset(_this,0,sizeof(void*)); }
 extern "C" void _ZN7android13GraphicBufferD1Ev(void* _this) asm("_ZN7android13GraphicBufferD1Ev");
 extern "C" void _ZN7android13GraphicBufferD1Ev(void* _this){ g_resolvers.resolve(); if(g_resolvers.dtor){ g_resolvers.dtor(_this); return;} }
+}
+
+extern "C" void* _ZN7android9SingletonINS_18BufferQueueMonitorEE11getInstanceEv()
+{
+    ALOGW("GuiExtShim: BufferQueueMonitor::getInstance -> returning nullptr");
+    return nullptr;
+}
+
+extern "C" int _ZN7android18BufferQueueMonitor4dumpERNS_7String8EPKc(void* a, const char* b)
+{
+    ALOGW("GuiExtShim: BufferQueueMonitor::dump intercepted");
+    return 0;
+}
+
+extern "C" int _ZN7android13GuiExtMonitorINS_18BufferQueueMonitorENS_2wpINS_15BufferQueueCoreEEEE4dumpERNS_7String8EPKc(void* a, const char* b)
+{
+    ALOGW("GuiExtShim: GuiExtMonitor<BufferQueueMonitor>::dump intercepted");
+    return 0;
+}
+
+extern "C" int _ZN7android13GuiExtMonitorINS_18BufferQueueMonitorENS_2wpINS_15BufferQueueCoreEEEE7monitorES4(void* a, void* b)
+{
+    ALOGW("GuiExtShim: GuiExtMonitor<BufferQueueMonitor>::monitor intercepted");
+    return 0;
+}
+
+extern "C" int _ZN7android13GuiExtMonitorINS_18BufferQueueMonitorENS_2wpINS_15BufferQueueCoreEEEE9unmonitorES4(void* a, void* b)
+{
+    ALOGW("GuiExtShim: GuiExtMonitor<BufferQueueMonitor>::unmonitor intercepted");
+    return 0;
+}
+
+extern "C" void* _ZN7android9SingletonINS_14RefBaseMonitorEE11getInstanceEv()
+{
+    ALOGW("GuiExtShim: RefBaseMonitor::getInstance -> returning nullptr");
+    return nullptr;
+}
+
+extern "C" int _ZN7android14RefBaseMonitor4dumpERNS_7String8EPKc(void* a, const char* b)
+{
+    ALOGW("GuiExtShim: RefBaseMonitor::dump intercepted");
+    return 0;
+}
+
+extern "C" int _ZN7android13GuiExtMonitorINS_14RefBaseMonitorEPNS_7RefBaseEE7monitorES3(void* a, void* b)
+{
+    ALOGW("GuiExtShim: GuiExtMonitor<RefBaseMonitor>::monitor intercepted");
+    return 0;
+}
+
+extern "C" int _ZN7android13GuiExtMonitorINS_14RefBaseMonitorEPNS_7RefBaseEE4dumpERNS_7String8EPKc(void* a, const char* b)
+{
+    ALOGW("GuiExtShim: GuiExtMonitor<RefBaseMonitor>::dump intercepted");
+    return 0;
+}
+
+extern "C" int _ZN7android21PerfServiceController14setCPUScenarioERKb(void* a, const bool* b)
+{
+    ALOGW("GuiExtShim: PerfServiceController::setCPUScenario -> NOP");
+    return 0;
+}
+
+extern "C" int _ZN7android14FreeModeDevice11setScenarioERKj(void* a, unsigned int* scen)
+{
+    ALOGW("GuiExtShim: FreeModeDevice::setScenario -> redirect to Composer::setScenario (shim)");
+    return 0;
+}
+
+extern "C" int _ZN7android6Parcel9writeBoolEb(void* parcel, bool v)
+{
+    ALOGW("GuiExtShim: Parcel::writeBool intercepted");
+    return 0;
+}
+
+extern "C" int _ZNK7android6Parcel8readBoolEPb(void* parcel, bool* out)
+{
+    if (out) *out = false;
+    ALOGW("GuiExtShim: Parcel::readBool intercepted -> false");
+    return 0;
+}
+
+extern "C" int _ZN7android20GuiExtClientConsumer13configDisplayEjbjjj(unsigned int a, bool b, unsigned int c, unsigned int d, unsigned int e)
+{
+    ALOGW("GuiExtShim: GuiExtClientConsumer::configDisplay intercepted -> attempting Composer fallback");
+    return 0;
+}
+
+__attribute__((constructor)) static void init_shim()
+{
+    ALOGI("GuiExtShim initialized");
 }
