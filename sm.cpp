@@ -26,6 +26,22 @@ static void* open_libui()
     handle.store(h, std::memory_order_release);
     return h;
 }
+static void* open_libgui()
+{
+    static std::atomic<void*> handle{nullptr};
+    void* h = handle.load(std::memory_order_acquire);
+    if (h) return h;
+    static pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
+    struct pthread_lock_guard { pthread_mutex_t* m; pthread_lock_guard(pthread_mutex_t* mm):m(mm){pthread_mutex_lock(m);} ~pthread_lock_guard(){pthread_mutex_unlock(m);} };
+    pthread_lock_guard lk(&m);
+    h = handle.load(std::memory_order_relaxed);
+    if (h) return h;
+    h = dlopen("/system/lib/libgui.so", RTLD_LAZY | RTLD_LOCAL);
+    if (!h) h = dlopen("/system/lib64/libgui.so", RTLD_LAZY | RTLD_LOCAL);
+    if (!h) h = dlopen("libgui.so", RTLD_LAZY | RTLD_LOCAL);
+    handle.store(h, std::memory_order_release);
+    return h;
+}
 namespace shim {
 using ctor_new_str_t = void (*)(void*, uint32, uint32, int32, uint32, std::string const&);
 using ctor_new_cstr_t = void (*)(void*, uint32, uint32, int32, uint32, const char*);
@@ -41,7 +57,10 @@ using lock_rect_t = int (*)(void*, uint32, void*, void**);
 using unlock_t = int (*)(void*);
 using getNativeBuffer_t = void* (*)(void*);
 using getFdCount_t = int (*)(void*);
-
+using gui_monitor_t = void (*)(void*, void*);
+using gui_unmonitor_t = void (*)(void*, void*);
+using gui_dump_t = void (*)(void*, void*, const char*);
+using gui_getproc_t = void* (*)(void*);
 struct Resolvers {
     ctor_new_str_t new_ctor_str = nullptr;
     ctor_new_cstr_t new_ctor_cstr = nullptr;
@@ -57,12 +76,17 @@ struct Resolvers {
     unlock_t unlock = nullptr;
     getNativeBuffer_t getNativeBuffer = nullptr;
     getFdCount_t getFdCount = nullptr;
+    gui_monitor_t gui_monitor = nullptr;
+    gui_unmonitor_t gui_unmonitor = nullptr;
+    gui_dump_t gui_dump = nullptr;
+    gui_getproc_t gui_getproc = nullptr;
     bool resolved = false;
     void resolve() {
         if (resolved) return;
         resolved = true;
         void* h = open_libui();
-        if (!h) return;
+        void* hg = open_libgui();
+        if (!h && !hg) return;
         const char* candidates_new_str[] = {
             "_ZN7android13GraphicBufferC1EjjijNSt3__112basic_stringIcNS1_11char_traitsIcEENS1_9allocatorIcEEEE",
             "_ZN7android13GraphicBufferC2EjjijNSt3__112basic_stringIcNS1_11char_traitsIcEENS1_9allocatorIcEEEE",
@@ -72,6 +96,7 @@ struct Resolvers {
         };
         for (const char** p = candidates_new_str; *p; ++p) {
             void* s = dlsym(h, *p);
+            if (!s && hg) s = dlsym(hg, *p);
             if (!s) continue;
             if (!new_ctor_str) new_ctor_str = reinterpret_cast<ctor_new_str_t>(s);
         }
@@ -82,6 +107,7 @@ struct Resolvers {
         };
         for (const char** p = candidates_new_cstr; *p; ++p) {
             void* s = dlsym(h, *p);
+            if (!s && hg) s = dlsym(hg, *p);
             if (!s) continue;
             if (!new_ctor_cstr) new_ctor_cstr = reinterpret_cast<ctor_new_cstr_t>(s);
         }
@@ -90,10 +116,13 @@ struct Resolvers {
             "_ZN7android13GraphicBufferC2EjjijjP13native_handle",
             "_ZN7android13GraphicBufferC1EjjijjP13native_handleb",
             "_ZN7android13GraphicBufferC2EjjijjP13native_handleb",
+            "_ZN7android13GraphicBufferC1EjjijjP11native_handle",
+            "_ZN7android13GraphicBufferC2EjjijjP11native_handle",
             nullptr
         };
         for (const char** p = candidates_stride; *p; ++p) {
             void* s = dlsym(h, *p);
+            if (!s && hg) s = dlsym(hg, *p);
             if (!s) continue;
             if (!ctor_stride) ctor_stride = reinterpret_cast<ctor_with_stride_t>(s);
         }
@@ -104,6 +133,7 @@ struct Resolvers {
         };
         for (const char** p = candidates_nativebuf; *p; ++p) {
             void* s = dlsym(h, *p);
+            if (!s && hg) s = dlsym(hg, *p);
             if (!s) continue;
             if (!ctor_nativebuf) ctor_nativebuf = reinterpret_cast<ctor_nativebuf_t>(s);
         }
@@ -115,6 +145,7 @@ struct Resolvers {
         };
         for (const char** p = candidates_dtor; *p; ++p) {
             void* s = dlsym(h, *p);
+            if (!s && hg) s = dlsym(hg, *p);
             if (!s) continue;
             if (!dtor) dtor = reinterpret_cast<dtor_t>(s);
         }
@@ -124,6 +155,7 @@ struct Resolvers {
         };
         for (const char** p = candidates_initSize_str; *p; ++p) {
             void* s = dlsym(h, *p);
+            if (!s && hg) s = dlsym(hg, *p);
             if (!s) continue;
             if (!initSize_str) initSize_str = reinterpret_cast<initSize_str_t>(s);
         }
@@ -133,6 +165,7 @@ struct Resolvers {
         };
         for (const char** p = candidates_initSize; *p; ++p) {
             void* s = dlsym(h, *p);
+            if (!s && hg) s = dlsym(hg, *p);
             if (!s) continue;
             if (!initSize_no_str) initSize_no_str = reinterpret_cast<initSize_t>(s);
         }
@@ -142,6 +175,7 @@ struct Resolvers {
         };
         for (const char** p = candidates_realloc; *p; ++p) {
             void* s = dlsym(h, *p);
+            if (!s && hg) s = dlsym(hg, *p);
             if (!s) continue;
             if (!reallocate) reallocate = reinterpret_cast<reallocate_t>(s);
         }
@@ -151,6 +185,7 @@ struct Resolvers {
         };
         for (const char** p = candidates_freehandle; *p; ++p) {
             void* s = dlsym(h, *p);
+            if (!s && hg) s = dlsym(hg, *p);
             if (!s) continue;
             if (!free_handle) free_handle = reinterpret_cast<free_handle_t>(s);
         }
@@ -161,6 +196,7 @@ struct Resolvers {
         };
         for (const char** p = candidates_lock; *p; ++p) {
             void* s = dlsym(h, *p);
+            if (!s && hg) s = dlsym(hg, *p);
             if (!s) continue;
             if (!lock) lock = reinterpret_cast<lock_t>(s);
         }
@@ -171,6 +207,7 @@ struct Resolvers {
         };
         for (const char** p = candidates_lock_rect; *p; ++p) {
             void* s = dlsym(h, *p);
+            if (!s && hg) s = dlsym(hg, *p);
             if (!s) continue;
             if (!lock_rect) lock_rect = reinterpret_cast<lock_rect_t>(s);
         }
@@ -180,6 +217,7 @@ struct Resolvers {
         };
         for (const char** p = candidates_unlock; *p; ++p) {
             void* s = dlsym(h, *p);
+            if (!s && hg) s = dlsym(hg, *p);
             if (!s) continue;
             if (!unlock) unlock = reinterpret_cast<unlock_t>(s);
         }
@@ -189,6 +227,7 @@ struct Resolvers {
         };
         for (const char** p = candidates_getNativeBuffer; *p; ++p) {
             void* s = dlsym(h, *p);
+            if (!s && hg) s = dlsym(hg, *p);
             if (!s) continue;
             if (!getNativeBuffer) getNativeBuffer = reinterpret_cast<getNativeBuffer_t>(s);
         }
@@ -198,8 +237,54 @@ struct Resolvers {
         };
         for (const char** p = candidates_getFdCount; *p; ++p) {
             void* s = dlsym(h, *p);
+            if (!s && hg) s = dlsym(hg, *p);
             if (!s) continue;
             if (!getFdCount) getFdCount = reinterpret_cast<getFdCount_t>(s);
+        }
+        const char* candidates_gui_monitor[] = {
+            "_ZN7android13GuiExtMonitorINS_18BufferQueueMonitorENS_2wpINS_15BufferQueueCoreEEEE7monitorES4_",
+            "_ZN7android13GuiExtMonitorINS_14RefBaseMonitorEPNS_7RefBaseEE7monitorES3_",
+            nullptr
+        };
+        for (const char** p = candidates_gui_monitor; *p; ++p) {
+            void* s = nullptr;
+            if (hg) s = dlsym(hg, *p);
+            if (!s) continue;
+            if (!gui_monitor) gui_monitor = reinterpret_cast<gui_monitor_t>(s);
+        }
+        const char* candidates_gui_unmonitor[] = {
+            "_ZN7android13GuiExtMonitorINS_18BufferQueueMonitorENS_2wpINS_15BufferQueueCoreEEEE9unmonitorES4_",
+            "_ZN7android13GuiExtMonitorINS_14RefBaseMonitorEPNS_7RefBaseEE9unmonitorES3_",
+            nullptr
+        };
+        for (const char** p = candidates_gui_unmonitor; *p; ++p) {
+            void* s = nullptr;
+            if (hg) s = dlsym(hg, *p);
+            if (!s) continue;
+            if (!gui_unmonitor) gui_unmonitor = reinterpret_cast<gui_unmonitor_t>(s);
+        }
+        const char* candidates_gui_dump[] = {
+            "_ZN7android13GuiExtMonitorINS_18BufferQueueMonitorENS_2wpINS_15BufferQueueCoreEEEE4dumpERNS_7String8EPKc",
+            "_ZN7android13GuiExtMonitorINS_14RefBaseMonitorEPNS_7RefBaseEE4dumpERNS_7String8EPKc",
+            nullptr
+        };
+        for (const char** p = candidates_gui_dump; *p; ++p) {
+            void* s = nullptr;
+            if (hg) s = dlsym(hg, *p);
+            if (!s) continue;
+            if (!gui_dump) gui_dump = reinterpret_cast<gui_dump_t>(s);
+        }
+        const char* candidates_gui_getproc[] = {
+            "_ZN7android13GuiExtMonitorINS_18BufferQueueMonitorENS_2wpINS_15BufferQueueCoreEEEE14getProcessNameEv",
+            "_ZN7android13GuiExtMonitorINS_18BufferQueueMonitorENS_2wpINS_15BufferQueueCoreEEEE10getKeyNameEv",
+            "_ZN7android13GuiExtMonitorINS_14RefBaseMonitorEPNS_7RefBaseEE14getProcessNameEv",
+            nullptr
+        };
+        for (const char** p = candidates_gui_getproc; *p; ++p) {
+            void* s = nullptr;
+            if (hg) s = dlsym(hg, *p);
+            if (!s) continue;
+            if (!gui_getproc) gui_getproc = reinterpret_cast<gui_getproc_t>(s);
         }
     }
 };
@@ -444,7 +529,61 @@ extern "C" int _ZN7android13GraphicBuffer10getFdCountEv(void* _this)
     g_resolvers.resolve();
     if (g_resolvers.getFdCount) {
         return g_resolvers.getFdCount(_this);
-    }
+        }
     return 0;
+}
+extern "C" void _ZN7android13GuiExtMonitorINS_18BufferQueueMonitorENS_2wpINS_15BufferQueueCoreEEEE7monitorES4_(void* _this, void* a) asm("_ZN7android13GuiExtMonitorINS_18BufferQueueMonitorENS_2wpINS_15BufferQueueCoreEEEE7monitorES4_");
+extern "C" void _ZN7android13GuiExtMonitorINS_18BufferQueueMonitorENS_2wpINS_15BufferQueueCoreEEEE9unmonitorES4_(void* _this, void* a) asm("_ZN7android13GuiExtMonitorINS_18BufferQueueMonitorENS_2wpINS_15BufferQueueCoreEEEE9unmonitorES4_");
+extern "C" void _ZN7android13GuiExtMonitorINS_18BufferQueueMonitorENS_2wpINS_15BufferQueueCoreEEEE4dumpERNS_7String8EPKc(void* _this, void* s, const char* c) asm("_ZN7android13GuiExtMonitorINS_18BufferQueueMonitorENS_2wpINS_15BufferQueueCoreEEEE4dumpERNS_7String8EPKc");
+extern "C" void _ZN7android13GuiExtMonitorINS_14RefBaseMonitorEPNS_7RefBaseEE7monitorES3_(void* _this, void* a) asm("_ZN7android13GuiExtMonitorINS_14RefBaseMonitorEPNS_7RefBaseEE7monitorES3_");
+extern "C" void _ZN7android13GuiExtMonitorINS_14RefBaseMonitorEPNS_7RefBaseEE9unmonitorES3_(void* _this, void* a) asm("_ZN7android13GuiExtMonitorINS_14RefBaseMonitorEPNS_7RefBaseEE9unmonitorES3_");
+extern "C" void _ZN7android13GuiExtMonitorINS_14RefBaseMonitorEPNS_7RefBaseEE4dumpERNS_7String8EPKc(void* _this, void* s, const char* c) asm("_ZN7android13GuiExtMonitorINS_14RefBaseMonitorEPNS_7RefBaseEE4dumpERNS_7String8EPKc");
+extern "C" void _ZN7android13GuiExtMonitorINS_18BufferQueueMonitorENS_2wpINS_15BufferQueueCoreEEEE7monitorES4_(void* _this, void* a)
+{
+    g_resolvers.resolve();
+    if (g_resolvers.gui_monitor) {
+        g_resolvers.gui_monitor(_this, a);
+        return;
+    }
+}
+extern "C" void _ZN7android13GuiExtMonitorINS_18BufferQueueMonitorENS_2wpINS_15BufferQueueCoreEEEE9unmonitorES4_(void* _this, void* a)
+{
+    g_resolvers.resolve();
+    if (g_resolvers.gui_unmonitor) {
+        g_resolvers.gui_unmonitor(_this, a);
+        return;
+    }
+}
+extern "C" void _ZN7android13GuiExtMonitorINS_18BufferQueueMonitorENS_2wpINS_15BufferQueueCoreEEEE4dumpERNS_7String8EPKc(void* _this, void* s, const char* c)
+{
+    g_resolvers.resolve();
+    if (g_resolvers.gui_dump) {
+        g_resolvers.gui_dump(_this, s, c);
+        return;
+    }
+}
+extern "C" void _ZN7android13GuiExtMonitorINS_14RefBaseMonitorEPNS_7RefBaseEE7monitorES3_(void* _this, void* a)
+{
+    g_resolvers.resolve();
+    if (g_resolvers.gui_monitor) {
+        g_resolvers.gui_monitor(_this, a);
+        return;
+    }
+}
+extern "C" void _ZN7android13GuiExtMonitorINS_14RefBaseMonitorEPNS_7RefBaseEE9unmonitorES3_(void* _this, void* a)
+{
+    g_resolvers.resolve();
+    if (g_resolvers.gui_unmonitor) {
+        g_resolvers.gui_unmonitor(_this, a);
+        return;
+    }
+}
+extern "C" void _ZN7android13GuiExtMonitorINS_14RefBaseMonitorEPNS_7RefBaseEE4dumpERNS_7String8EPKc(void* _this, void* s, const char* c)
+{
+    g_resolvers.resolve();
+    if (g_resolvers.gui_dump) {
+        g_resolvers.gui_dump(_this, s, c);
+        return;
+    }
 }
 }
