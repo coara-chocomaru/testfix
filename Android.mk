@@ -33,7 +33,7 @@ LOCAL_MODULE := libshim_gui_ui
 LOCAL_SRC_FILES := sm.cpp
 LOCAL_CPPFLAGS := -fPIC -std=gnu++11 -D_GLIBCXX_USE_CXX11_ABI=1 -DANDROID -fno-exceptions -fno-rtti -include stdint.h -include stddef.h
 LOCAL_C_INCLUDES := $(LOCAL_PATH)
-LOCAL_LDLIBS := -llog -ldl -latomic -lm
+LOCAL_LDLIBS := -llog -ldl
 LOCAL_STATIC_LIBRARIES := libc++_static
 LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE_CLASS := SHARED_LIBRARIES
