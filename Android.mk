@@ -1,5 +1,4 @@
 LOCAL_PATH := $(call my-dir)
-
 APP_ALLOW_MISSING_DEPS=true
 include $(CLEAR_VARS)
 LOCAL_MODULE := shim_gui_ui
