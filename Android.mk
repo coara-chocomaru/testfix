@@ -36,11 +36,9 @@ LOCAL_MODULE_PATH := $(TARGET_OUT)/bin
 LOCAL_SRC_FILES := fixdata.c
 LOCAL_CFLAGS += -Wall -Werror -Wno-unused-parameter
 LOCAL_FORCE_STATIC_EXECUTABLE := true
-
 LOCAL_STATIC_LIBRARIES := \
     libc \
     libcutils
-
 ifeq ($(TARGET_ARCH),arm64)
     LOCAL_CFLAGS += -DARCH_ARM64
 endif
