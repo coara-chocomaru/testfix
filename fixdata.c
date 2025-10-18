@@ -34,7 +34,6 @@ void recursive_chmod(const char *path, mode_t mode) {
         if (lstat(fullpath, &st) == 0 && S_ISDIR(st.st_mode)) {
             recursive_chmod(fullpath, mode);
         } else {
-            // Change permissions on files
             if (chmod(fullpath, mode) != 0) {
                 perror("chmod failed on file");
             }
