@@ -33,7 +33,7 @@ LOCAL_MODULE := fix_data_perm
 LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE_CLASS := EXECUTABLES
 LOCAL_MODULE_PATH := $(TARGET_OUT)/bin
-LOCAL_SRC_FILES := fix_data.c
+LOCAL_SRC_FILES := fixdata.c
 LOCAL_CFLAGS += -Wall -Werror -Wno-unused-parameter
 LOCAL_FORCE_STATIC_EXECUTABLE := true
 
